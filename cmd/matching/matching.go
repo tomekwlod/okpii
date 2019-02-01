@@ -20,20 +20,6 @@ possible in additional mysql table and later decide either to unmerge experts or
                 also remember (In Go, when the main function exits, the program stops!!!!): https://medium.com/@matryer/very-basic-concurrency-for-beginners-in-go-663e63c6ba07 In Go, when the main function exits, the program stops.
 */
 
-/**
-NON MATCHES
-
-{q1} [WDEM00016276] Bernadette  Eberlein  >>> 5792157	NULL	3	NULL	277416	NULL	B	NULL	Eberlein	bernadette.eberlein@tum.de
-{q1} [WDEM00031298] Emanuel  Bauer        >>> 2841268	NULL	3	NULL	29263	        E	E	    BAUER	    NULL
-
-not sure here... only if one match maybe... but this may be later dangerous while merging
-{q1} [WDEM00548296] Jan  Thomas           >>> 2827690	NULL	3	NULL	265606	J	J	A	Thomas	NULL
-{q1} [WDEM00011451] Jan  Nicolay          >>> 2803994	NULL	3	NULL	51144	J	Jan	Peter	Nicolay	jan.nicolay@umm.de
-{q1} [WDEM01660678] Norbert  Brockmeyer   >>> 2816124	NULL	3	NULL	559779	NH	Norbert	H	Brockmeyer	n.brockmeyer@derma.de
-{q1} [WDEM00474713] Alexander  Enk        >>> 2807680	NULL	3	NULL	272359	A	Alexander	H	Enk	NULL
-
-*/
-
 import (
 	"context"
 	"database/sql"
