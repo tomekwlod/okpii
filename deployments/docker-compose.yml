@@ -1,0 +1,20 @@
+# make rebuild
+# 
+# docker-compose exec  mongodb bash     <-- running mongodb cli
+# docker-compose run --rm  go-cli       <-- running checker ./ping
+
+version: '3'
+
+services:
+    go-cli:
+        container_name: ${CLI_NAME}
+        build:
+            context: ../
+            dockerfile: ./deployments/cli/Dockerfile
+        volumes:
+            - ../log:/root/log
+        env_file:
+            - .env
+networks:
+    default:
+        driver: bridge
