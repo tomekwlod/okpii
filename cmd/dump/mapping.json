@@ -10,7 +10,7 @@
                 "ascii_lower_norm":{
                     "type": "custom",
                     "char_filter": [],
-                    "filter":["lowercase","asciifolding"]
+                    "filter":["lowercase", "asciifolding"]
                 }
             }
         }
@@ -18,6 +18,18 @@
     "mappings":{
         "data":{
             "properties":{
+                "fn":{
+                    "type":"keyword",
+                    "normalizer":"ascii_norm"
+                },
+                "mn":{
+                    "type":"keyword",
+                    "normalizer":"ascii_norm"
+                },
+                "ln":{
+                    "type":"keyword",
+                    "normalizer":"ascii_norm"
+                },
                 "name":{
                     "type":"text"
                 },

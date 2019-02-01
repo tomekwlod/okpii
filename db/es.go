@@ -34,6 +34,8 @@ func Client() (client *elastic.Client, err error) {
 		return
 	}
 
+	fmt.Println("Connection to ElasticServer established")
+
 	return
 }
 

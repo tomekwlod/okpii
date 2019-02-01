@@ -48,5 +48,7 @@ func MysqlClient() (db *sql.DB, err error) {
 		return
 	}
 
+	fmt.Println("Connection to MySQL established")
+
 	return
 }
