@@ -15,6 +15,29 @@ services:
             - ../log:/root/log
         env_file:
             - .env
+    elasticsearch:
+        container_name: ${ES_NAME}
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html
+        # sysctl -w vm.max_map_count=262144 <--- execute this on prod machine OR:
+        # optional---->grep MemTotal /proc/meminfo | awk '{printf "%.0f",$2}'
+        # optional---->divide above bby 16, and use the value below
+        # optional---->sysctl vm.max_map_count=262144  <---- available only until reboot!! do below:
+        # echo "vm.max_map_count = 262144" | tee -a /etc/sysctl.conf
+        # sysctl -p
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/vm-max-map-count.html
+        image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.4.0
+        environment:
+            - cluster.name=docker-cluster
+            - bootstrap.memory_lock=true
+            - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+        ulimits:
+            memlock:
+                soft: -1
+                hard: -1
+        volumes:
+            - ../data/es:/usr/share/elasticsearch/data
+        ports:
+            - 9202:9200
 networks:
     default:
         driver: bridge

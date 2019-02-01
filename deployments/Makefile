@@ -15,3 +15,6 @@ rebuild:
 	make destroy
 	make build
 	make start
+
+# Run below to populate the ENVs in dev (DO NOT RUN IT IN PROD!!) 
+# set -a && . ./.env && set +a && echo $(cut -d= -f1 ./.env) && echo ${MYSQL_USER}

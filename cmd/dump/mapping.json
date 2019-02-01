@@ -1,0 +1,48 @@
+{
+    "settings":{
+        "analysis":{
+            "normalizer": {
+                "ascii_norm": {
+                    "type": "custom",
+                    "char_filter": [],
+                    "filter":["asciifolding"]
+                },
+                "ascii_lower_norm":{
+                    "type": "custom",
+                    "char_filter": [],
+                    "filter":["lowercase","asciifolding"]
+                }
+            }
+        }
+    },
+    "mappings":{
+        "data":{
+            "properties":{
+                "name":{
+                    "type":"text"
+                },
+                "nameKeyword":{
+                    "type":"keyword",
+                    "normalizer":"ascii_norm"
+                },
+                "nameKeywordSquash":{
+                    "type":"keyword",
+                    "normalizer":"ascii_norm"
+                },
+                "nameKeywordRaw":{
+                    "type":"keyword",
+                    "normalizer":"ascii_lower_norm"
+                },
+                "aliases":{
+                    "type":"keyword"
+                },
+                "city":{
+                    "type":"keyword"
+                },
+                "country":{
+                    "type":"keyword"
+                }
+            }
+        }
+    }
+}
