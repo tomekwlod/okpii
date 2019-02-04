@@ -38,8 +38,8 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-const cdid = 3
-const germans = 2221
+const cdid = 9
+const germans = 12890
 
 type service struct {
 	es    *elastic.Client
@@ -115,7 +115,7 @@ func processCSV(rc io.Reader) (ch chan []string) {
 
 		r := csv.NewReader(reader)
 		if _, err := r.Read(); err != nil { // read header
-			log.Fatal(err)
+			panic(err)
 		}
 		defer close(ch)
 
@@ -125,7 +125,7 @@ func processCSV(rc io.Reader) (ch chan []string) {
 				if err == io.EOF {
 					break
 				}
-				log.Fatal(err)
+				panic(err)
 
 			}
 

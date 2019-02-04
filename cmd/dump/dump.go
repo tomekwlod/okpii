@@ -13,7 +13,7 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-const cdid = 2
+const cdid = 9
 const batchInsert = 3000
 
 type service struct {
@@ -170,8 +170,8 @@ func (s *service) indexExperts(experts []*Experts) (err error) {
 }
 
 func transform(rows *sql.Rows) (e *Experts, err error) {
-	var id, did, position int // if nullable then if should be sql.NullInt64
-	var npi, ttid sql.NullInt64
+	var id, did int // if nullable then if should be sql.NullInt64
+	var npi, ttid, position sql.NullInt64
 	var fn, mn, ln, city, country sql.NullString // not just string here because of nulls
 	var fn1, fn2, fn3, fn4 sql.NullString
 
@@ -204,7 +204,7 @@ func transform(rows *sql.Rows) (e *Experts, err error) {
 		Deleted:           0,
 		FNDash:            strings.Contains(fn.String, "-"),
 		FNDot:             strings.Contains(fn.String, "."),
-		Position:          position,
+		Position:          int(position.Int64),
 		City:              city.String,
 		Country:           country.String,
 		Aliases:           aliases,
