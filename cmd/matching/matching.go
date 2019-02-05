@@ -17,7 +17,7 @@ possible in additional mysql table and later decide either to unmerge experts or
 @todo aliases/nicknames
 @todo replaced names
 @todo introduce goroutines for eg. saving onekey to external db https://medium.com/@nikolay.bystritskiy/how-i-tried-to-do-things-asynchronously-in-golang-40e0c1a06a66
-                also remember (In Go, when the main function exits, the program stops!!!!): https://medium.com/@matryer/very-basic-concurrency-for-beginners-in-go-663e63c6ba07 In Go, when the main function exits, the program stops.
+                also remember (In Go, when the main function exits, the program stops as well as all goroutines!!!!): https://medium.com/@matryer/very-basic-concurrency-for-beginners-in-go-663e63c6ba07 In Go, when the main function exits, the program stops.
 */
 
 import (
@@ -31,7 +31,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mongodb/mongo-go-driver/mongo/options"
+
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/mongodb/mongo-go-driver/bson"
+	"github.com/mongodb/mongo-go-driver/mongo"
 	"github.com/tomekwlod/okpii/db"
 	_ "golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding/unicode"
@@ -41,9 +45,73 @@ import (
 const cdid = 9
 const germans = 12890
 
+type SearchModel struct {
+	// SRC_CUST_CLASS    string
+	// CUST_CLASS        string
+	// DELETED_DATE      string
+	// DOB               string
+	// STS_RSN           string
+	// PREFIX            string
+	// SRC_CUST_SUBTYP   string
+	// SRC_ORG_NAME      string
+	// Address_Line_3    string
+	// STS_CD            string
+	// DELETED_BY        string
+	// DEL_DT            string
+	// City              string
+	// CUST_NAME         string
+	// SRC_LAST_NAME     string
+	// DIRTY_IND         string
+	// LAST_ROWID_SYSTEM string
+	// MIDDLE_NAME       string
+	// CREATE_DATE       string
+	// SALUTATION        string
+	// SRC_PREFIX        string
+	// DELETED_IND       string
+	// CREATOR           string
+	// CUST_TYP          string
+	// BGHU_PRES_FLAG    string
+	// Address_Line_2    string
+	// CONSOLIDATION_IND string
+	// SRC_SUFFIX        string
+	// SRC_CUST_ID       string
+	// SRC_SYS_CD        string
+	// ZIP               string
+	// HUB_STATE_IND     string
+	// SRC_GENDER        string
+	// SRC_FIRST_NAME    string
+	// Country           string
+	// OneKeyID_Address  string
+	// LAST_NAME         string
+	// SRC_CNTRY         string
+	// DEL_BY            string
+	// INTERACTION_ID    string
+	// State             string
+	// CNTRY             string
+	// IS_VALID          string
+	// CUST_SUBTYP       string
+	// Address_Line_1    string
+	// SIP_POP           string
+	// BO_CLASS_CODE     string
+	// INITIALS          string
+	// FIRST_NAME        string
+	// SRC_MIDDLE_NAME   string
+	// CM_DIRTY_IND      string
+	// USE_IN_MTCH_FLG   string
+	// SRC_CUST_TYP      string
+	// ROWID_OBJECT      string
+	// LAST_UPDATE_DATE  string
+	// GENDER            string
+	// DEL_CD            string
+	// UPDATED_BY        string
+	// SRC_STS_CD        string
+	// SUFFIX            string
+}
+
 type service struct {
 	es    *elastic.Client
 	mysql *sql.DB
+	mongo *mongo.Database
 	// logger  *log.Logger
 }
 
@@ -60,10 +128,68 @@ func main() {
 	}
 	defer mysqlClient.Close()
 
+	mongoClient, err := db.MongoDB()
+	if err != nil {
+		panic(err)
+	}
+
 	s := &service{
 		es:    esClient,
 		mysql: mysqlClient,
+		mongo: mongoClient,
 	}
+
+	// Here's an array in which you can store the decoded documents
+	// var results []*SearchModel
+	var results []map[string]interface{}
+
+	// defining the collection
+	collection := s.mongo.Collection("test")
+
+	// filter := bson.D{{"SRC_CUST_ID", "WDEM01690729"}}
+	filter := bson.D{{}}
+
+	// Pass these options to the Find method
+	options := options.Find()
+	options.SetProjection(bson.D{
+		{"_id", 0},
+		{"SRC_FIRST_NAME", 1},
+		{"SRC_MIDDLE_NAME", 1},
+		{"SRC_LAST_NAME", 1},
+		{"SRC_ORG_NAME", 1},
+		{"SRC_CUST_ID", 1},
+	})
+	// options.SetLimit(10)
+
+	cur, err2 := collection.Find(context.TODO(), filter, options)
+	if err2 != nil {
+		panic(err2)
+	}
+
+	// Finding multiple documents returns a cursor
+	// Iterating through the cursor allows us to decode documents one at a time
+	for cur.Next(context.TODO()) {
+		// create a value into which the single document can be decoded
+		var elem map[string]interface{}
+
+		err := cur.Decode(&elem)
+		if err != nil {
+			panic(err)
+		}
+
+		results = append(results, elem)
+	}
+
+	if err := cur.Err(); err != nil {
+		panic(err)
+	}
+
+	// Close the cursor once finished
+	cur.Close(context.TODO())
+
+	fmt.Println(len(results))
+
+	return
 
 	// Load a TXT file.
 	f, err := os.Open("./file2.csv")

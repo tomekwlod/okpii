@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -39,6 +40,8 @@ func MongoDB() (database *mongo.Database, err error) {
 	if err != nil {
 		return
 	}
+
+	fmt.Println("Connection to MongoDB established")
 
 	database = client.Database(dbname)
 
