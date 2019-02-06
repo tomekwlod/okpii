@@ -28,85 +28,22 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"strings"
-
-	"github.com/mongodb/mongo-go-driver/mongo/options"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/mongodb/mongo-go-driver/bson"
 	"github.com/mongodb/mongo-go-driver/mongo"
+	"github.com/mongodb/mongo-go-driver/mongo/options"
 	"github.com/tomekwlod/okpii/db"
 	_ "golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding/unicode"
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-const cdid = 9
-const germans = 12890
-
-type SearchModel struct {
-	// SRC_CUST_CLASS    string
-	// CUST_CLASS        string
-	// DELETED_DATE      string
-	// DOB               string
-	// STS_RSN           string
-	// PREFIX            string
-	// SRC_CUST_SUBTYP   string
-	// SRC_ORG_NAME      string
-	// Address_Line_3    string
-	// STS_CD            string
-	// DELETED_BY        string
-	// DEL_DT            string
-	// City              string
-	// CUST_NAME         string
-	// SRC_LAST_NAME     string
-	// DIRTY_IND         string
-	// LAST_ROWID_SYSTEM string
-	// MIDDLE_NAME       string
-	// CREATE_DATE       string
-	// SALUTATION        string
-	// SRC_PREFIX        string
-	// DELETED_IND       string
-	// CREATOR           string
-	// CUST_TYP          string
-	// BGHU_PRES_FLAG    string
-	// Address_Line_2    string
-	// CONSOLIDATION_IND string
-	// SRC_SUFFIX        string
-	// SRC_CUST_ID       string
-	// SRC_SYS_CD        string
-	// ZIP               string
-	// HUB_STATE_IND     string
-	// SRC_GENDER        string
-	// SRC_FIRST_NAME    string
-	// Country           string
-	// OneKeyID_Address  string
-	// LAST_NAME         string
-	// SRC_CNTRY         string
-	// DEL_BY            string
-	// INTERACTION_ID    string
-	// State             string
-	// CNTRY             string
-	// IS_VALID          string
-	// CUST_SUBTYP       string
-	// Address_Line_1    string
-	// SIP_POP           string
-	// BO_CLASS_CODE     string
-	// INITIALS          string
-	// FIRST_NAME        string
-	// SRC_MIDDLE_NAME   string
-	// CM_DIRTY_IND      string
-	// USE_IN_MTCH_FLG   string
-	// SRC_CUST_TYP      string
-	// ROWID_OBJECT      string
-	// LAST_UPDATE_DATE  string
-	// GENDER            string
-	// DEL_CD            string
-	// UPDATED_BY        string
-	// SRC_STS_CD        string
-	// SUFFIX            string
-}
+const cdid = 2
+const germans = 2933
+const all = 57251
 
 type service struct {
 	es    *elastic.Client
@@ -116,6 +53,7 @@ type service struct {
 }
 
 func main() {
+	t1 := time.Now()
 
 	esClient, err := db.Client()
 	if err != nil {
@@ -139,9 +77,51 @@ func main() {
 		mongo: mongoClient,
 	}
 
-	// Here's an array in which you can store the decoded documents
-	// var results []*SearchModel
-	var results []map[string]interface{}
+	ch := make(chan map[string]string) // one line from csv
+	go s.onekeys(ch)
+
+	var i, count, all int
+	for m := range ch {
+		i++
+
+		fn, mn, ln := names(m)
+
+		matches := s.findMatches(m["SRC_CUST_ID"], fn, mn, ln)
+
+		for _, match := range matches {
+			if match["id"] != nil {
+				kid64 := match["id"].(float64)
+				kid := int(kid64)
+
+				if kid > 0 {
+					s.update(kid, m["SRC_CUST_ID"])
+					// st, _ := s.update(kid, row[39])
+					// fmt.Println("----", st, "----")
+
+					count++
+
+				} else {
+					fmt.Println("ID NOT VALID ", match["id"], kid)
+				}
+			}
+		}
+
+		all++
+	}
+
+	t2 := time.Now()
+
+	real := (float64(count) * 100) / float64(all)
+	perc := (float64(count) * 100) / germans
+
+	fmt.Println("")
+	fmt.Printf("All: %d\tMatched: %d\tPercent: %f\t Real: %f\n", all, count, perc, real)
+
+	fmt.Printf("All done in: %v \n", t2.Sub(t1))
+}
+
+func (s *service) onekeys(out chan<- map[string]string) {
+	defer close(out)
 
 	// defining the collection
 	collection := s.mongo.Collection("test")
@@ -161,23 +141,23 @@ func main() {
 	})
 	// options.SetLimit(10)
 
-	cur, err2 := collection.Find(context.TODO(), filter, options)
-	if err2 != nil {
-		panic(err2)
+	cur, err := collection.Find(context.TODO(), filter, options)
+	if err != nil {
+		panic(err)
 	}
 
 	// Finding multiple documents returns a cursor
 	// Iterating through the cursor allows us to decode documents one at a time
 	for cur.Next(context.TODO()) {
 		// create a value into which the single document can be decoded
-		var elem map[string]interface{}
+		var elem map[string]string
 
 		err := cur.Decode(&elem)
 		if err != nil {
 			panic(err)
 		}
 
-		results = append(results, elem)
+		out <- elem
 	}
 
 	if err := cur.Err(); err != nil {
@@ -186,50 +166,6 @@ func main() {
 
 	// Close the cursor once finished
 	cur.Close(context.TODO())
-
-	fmt.Println(len(results))
-
-	return
-
-	// Load a TXT file.
-	f, err := os.Open("./file2.csv")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	var i, count, all int
-	for row := range processCSV(f) {
-		i++
-
-		fn, mn, ln := names(row)
-
-		match := s.findMatch(row[39], fn, mn, ln)
-
-		if match["id"] != nil {
-			kid64 := match["id"].(float64)
-			kid := int(kid64)
-
-			if kid > 0 {
-				s.update(kid, row[39])
-				// st, _ := s.update(kid, row[39])
-				// fmt.Println("----", st, "----")
-
-				count++
-
-			} else {
-				fmt.Println("ID NOT VALID ", match["id"], kid)
-			}
-		}
-
-		all++
-	}
-
-	real := (float64(count) * 100) / float64(all)
-	perc := (float64(count) * 100) / germans
-
-	fmt.Println("")
-	fmt.Printf("All: %d\tMatched: %d\tPercent: %f\t Real: %f\n", all, count, perc, real)
 }
 
 func processCSV(rc io.Reader) (ch chan []string) {
@@ -277,7 +213,7 @@ func (s *service) update(id int, oneky string) (status int64, err error) {
 	return
 }
 
-func (s *service) findMatch(id, fn, mn, ln string) map[string]interface{} {
+func (s *service) findMatches(id, fn, mn, ln string) (result []map[string]interface{}) {
 	var row map[string]interface{}
 
 	for _, i := range []int{1, 2} {
@@ -294,14 +230,12 @@ func (s *service) findMatch(id, fn, mn, ln string) map[string]interface{} {
 			panic(err)
 		}
 
-		// fmt.Printf("Query took %d milliseconds\n", searchResult.TookInMillis)
-
 		// var data []map[string]interface{}
-		if searchResult.Hits.TotalHits > 1 {
-			fmt.Printf("  !!!!!!  Too many results %s \n", id)
+		if searchResult.Hits.TotalHits > 2 || (searchResult.Hits.TotalHits > 1 && i == 2) {
+			fmt.Printf("  !!!!!!  Too many (%d) results %s; IMPLEMENT BOOST HERE AND TAKE THE FIRST MATCH!\n", searchResult.Hits.TotalHits, id)
 
 			continue
-		} else if searchResult.Hits.TotalHits == 1 {
+		} else if searchResult.Hits.TotalHits == 1 || (searchResult.Hits.TotalHits == 2 && i == 1) {
 			// fmt.Printf("  ==  Found a total of %d record(s) \n", searchResult.Hits.TotalHits)
 
 			for _, hit := range searchResult.Hits.Hits {
@@ -311,10 +245,12 @@ func (s *service) findMatch(id, fn, mn, ln string) map[string]interface{} {
 					panic(err)
 				}
 
-				fmt.Printf("{q%d} [%s] %s %s %s \t\t ====> \t [%s] %s, %s, npi: %v, ttid: %v\n", i, id, fn, mn, ln, hit.Id, row["name"], row["country"], row["npi"], row["ttid"])
+				result = append(result, row)
 
-				return row
+				fmt.Printf("{q%d} [%s] %s %s %s \t\t ====> \t [%s] %s, %s, npi: %v, ttid: %v\n", i, id, fn, mn, ln, hit.Id, row["name"], row["country"], row["npi"], row["ttid"])
 			}
+
+			return
 		} else {
 			// fmt.Printf("{q%d} [%s] %s %s %s \t\t ====> Not found\n", i, id, fn, mn, ln)
 
@@ -322,7 +258,7 @@ func (s *service) findMatch(id, fn, mn, ln string) map[string]interface{} {
 		}
 	}
 
-	return row
+	return
 }
 
 func querySelector(option int, id, fn, mn, ln string, did int) (q *elastic.SearchSource) {
@@ -422,11 +358,10 @@ func PrintESQuery(nss *elastic.SearchSource) {
 	log.Printf("%s\n", string(data))
 }
 
-func names(row []string) (fn, mn, ln string) {
-	// custName = row[41]
-	fn = row[42]
-	mn = row[43]
-	ln = row[44]
+func names(m map[string]string) (fn, mn, ln string) {
+	fn = m["SRC_FIRST_NAME"]
+	mn = m["SRC_MIDDLE_NAME"]
+	ln = m["SRC_LAST_NAME"]
 
 	// if no MN but a space in FN then split
 	if mn == "" {
@@ -464,3 +399,48 @@ func FirstChar(str string) (c string) {
 
 	return
 }
+
+// remove me later
+// curl -X GET "localhost:9202/experts/_search" -H 'Content-Type: application/json' -d'
+// {
+// "query": {
+//     "bool": {
+// 		"filter": {
+// 		  "match_phrase": {
+// 			"did": {
+// 			  "query": 2
+// 			}
+// 		  }
+// 		},
+// 		"minimum_should_match": "1",
+// 		"should": [
+// 		  {
+// 			"term": {
+// 			  "nameKeyword": "Jens Malte Baron"
+// 			}
+// 		  },
+// 		  {
+// 			"term": {
+// 			  "nameKeywordSquash": "JensMalteBaron"
+// 			}
+// 		  },
+// 		  {
+// 			"term": {
+// 			  "nameKeywordRaw": "JensMalteBaron"
+// 			}
+// 		  },
+// 		  {
+// 			"term": {
+// 			  "nameKeyword": "Jens M Baron"
+// 			}
+// 		  },
+// 		  {
+// 			"term": {
+// 			  "nameKeywordSquash": "JensMBaron"
+// 			}
+// 		  }
+// 		]
+// 	  }
+// 	}
+// }
+// ' | json_pp
