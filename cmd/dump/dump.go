@@ -1,5 +1,10 @@
 package main
 
+/*
+DUMP
+Dumps data from MySQL to Elasticsearch
+*/
+
 import (
 	"context"
 	"database/sql"
@@ -13,7 +18,7 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-const cdid = 9
+const cdid = 1
 const batchInsert = 3000
 
 type service struct {
@@ -44,7 +49,7 @@ type Experts struct {
 }
 
 func main() {
-	esClient, err := db.Client()
+	esClient, err := db.ESClient()
 	checkErr(err)
 
 	mysqlClient, err := db.MysqlClient()

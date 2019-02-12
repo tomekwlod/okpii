@@ -18,7 +18,7 @@ type esConfig struct {
 	UseSniffer bool
 }
 
-func Client() (client *elastic.Client, err error) {
+func ESClient() (client *elastic.Client, err error) {
 	ec := esConfig{"localhost", 9202, false}
 
 	// Create ES client here; If no connection - nothing to do here

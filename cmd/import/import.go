@@ -1,5 +1,10 @@
 package main
 
+/*
+IMPORT
+Imports a CSV file to MongoDB database
+*/
+
 import (
 	"bufio"
 	"context"
