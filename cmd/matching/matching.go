@@ -28,10 +28,12 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/mongodb/mongo-go-driver/bson"
+	"github.com/mongodb/mongo-go-driver/bson/primitive"
 	"github.com/mongodb/mongo-go-driver/mongo"
 	"github.com/mongodb/mongo-go-driver/mongo/options"
 	"github.com/tomekwlod/okpii/db"
@@ -39,7 +41,7 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-const cdid = "1,2,3"
+const cdid = "15,16,17,22,24,25,26,27,28,29,30,31,32"
 
 type service struct {
 	es    *elastic.Client
@@ -50,6 +52,7 @@ type service struct {
 
 func main() {
 	t1 := time.Now()
+	var wg sync.WaitGroup
 
 	esClient, err := db.ESClient()
 	if err != nil {
@@ -87,12 +90,16 @@ func main() {
 			did, _ := strconv.Atoi(did)
 
 			queryNumber, matches := s.findMatches(did, m["SRC_CUST_ID"], m["City"], fn, mn, ln)
-			// _, matches := s.findMatches(cdid, m["SRC_CUST_ID"], m["City"], fn, mn, ln)
+			// _, matches := s.findMatches(did, m["SRC_CUST_ID"], m["City"], fn, mn, ln)
 
 			for _, match := range matches {
 				if match["id"] != nil {
 					kid64 := match["id"].(float64)
 					kid := int(kid64)
+
+					// if queryNumber != 4 {
+					// 	continue
+					// }
 
 					if kid > 0 {
 						fmt.Printf("{q%d}: [%s] %s %s %s {%s}\t\t ====> \t [%d] %s, {%s} npi: %v, ttid: %v\n",
@@ -100,7 +107,8 @@ func main() {
 							kid, match["name"], match["city"], match["npi"], match["ttid"],
 						)
 
-						s.update(kid, did, m["SRC_CUST_ID"])
+						wg.Add(1)
+						go s.update(&wg, kid, did, m["SRC_CUST_ID"])
 
 					} else {
 						fmt.Println("ID NOT VALID ", match["id"], kid)
@@ -113,7 +121,8 @@ func main() {
 
 	t2 := time.Now()
 
-	fmt.Printf("All done in: %v \n", t2.Sub(t1))
+	wg.Wait()
+	fmt.Printf("\nAll done in: %v \n", t2.Sub(t1))
 }
 
 func (s *service) isInOneKeyDB(fn, mn, ln string) bool {
@@ -142,6 +151,29 @@ func (s *service) isInOneKeyDB(fn, mn, ln string) bool {
 
 	// entry found, skip!
 	return false
+}
+func (s *service) countOneKeyOcc(fn, ln string) int64 {
+	// defining the collection
+	collection := s.mongo.Collection("test")
+
+	// filter := bson.D{{"SRC_CUST_ID", "WDEM01690729"}}
+	filter := bson.M{
+		"SRC_FIRST_NAME": primitive.Regex{Pattern: "^" + fn + ".*", Options: ""},
+		"SRC_LAST_NAME":  ln,
+	}
+
+	// Pass these options to the Find method
+	// options := options.Count()
+
+	counter, err := collection.Count(context.TODO(), filter, nil)
+
+	if err != nil {
+		// no match, it is truly unique
+		panic(err)
+	}
+
+	// entry found, skip!
+	return counter
 }
 
 func (s *service) onekeys(out chan<- map[string]string) {
@@ -193,7 +225,8 @@ func (s *service) onekeys(out chan<- map[string]string) {
 	cur.Close(context.TODO())
 }
 
-func (s *service) update(id, did int, oneky string) (status int64, err error) {
+func (s *service) update(wg *sync.WaitGroup, id, did int, oneky string) (status int64, err error) {
+	defer wg.Done()
 	// @todo: also maybe ES needs to be updated to speed up re-runing the process
 	// @todo: do it in async mode!
 
@@ -214,12 +247,7 @@ func (s *service) findMatches(did int, id, city, fn, mn, ln string) (queryNumber
 		return
 	}
 
-	for _, queryNumber = range []int{1, 2, 3} {
-
-		// if queryNumber != 2 {
-		// 	// testing q2 only!!
-		// 	continue
-		// }
+	for _, queryNumber = range []int{1, 2, 3, 4} {
 
 		result = s.search(queryNumber, id, fn, mn, ln, city, did) //deployment=XX
 
@@ -288,6 +316,8 @@ func (s *service) search(option int, id, fn, mn, ln, city string, did int) (resu
 		return s.aliases(id, fn, mn, ln, city, did)
 	case 3:
 		return s.short(id, fn, mn, ln, city, did)
+	case 4:
+		return s.noMiddleNameOnly(id, fn, mn, ln, city, did)
 	// case 4:
 	// 	// this is quite risky. there should be a check if only one available match!
 	// 	return s.noMiddleName(id, fn, mn, ln, city, did)
@@ -586,6 +616,64 @@ func (s *service) noMiddleName(id, fn, mn, ln, city string, did int) (result []m
 	return
 }
 
+func (s *service) noMiddleNameOnly(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+	q := elastic.NewBoolQuery().Filter(
+		elastic.NewMatchPhraseQuery("did", did),
+		elastic.NewMatchPhraseQuery("ln", ln),
+		elastic.NewTermQuery("mn", ""),
+	)
+
+	if mn != "" {
+		// this case is only for the names with NO MN included
+
+		// ---------------------------
+		// [WDEM02118277]
+		// ->Ralf  Dittrich {OSNABRÜCK}             ====> Found [did:1]: 5711743
+		// 0.   R  Dittrich {}
+		//
+		// We want to match this only if R* Dittrich exist in OneKey Db only once!
+		return nil
+	}
+
+	q.Must(elastic.NewMatchPhraseQuery("fn", FirstChar(fn)))
+
+	nss := elastic.NewSearchSource().Query(q)
+
+	searchResult, err := s.es.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	if searchResult.Hits.TotalHits == 0 {
+		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
+		return nil
+	}
+
+	if searchResult.Hits.TotalHits > 1 {
+		fmt.Printf("[%s] \t\t ====> Too many results! Should be only one like: %s %s\n", id, FirstChar(fn), ln)
+		return nil
+	}
+
+	for _, hit := range searchResult.Hits.Hits {
+		total := s.countOneKeyOcc(FirstChar(fn), ln)
+
+		if total == 1 {
+			var row map[string]interface{}
+
+			err := json.Unmarshal(*hit.Source, &row)
+			if err != nil {
+				panic(err)
+			}
+
+			result = append(result, row)
+
+			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
+		}
+	}
+
+	return
+}
+
 // func (s *service) madnessTemp(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 // 	q := elastic.NewBoolQuery().Filter(
 // 		elastic.NewMatchPhraseQuery("did", did),
@@ -742,7 +830,7 @@ func (s *service) testSearch(id, fn, mn, ln, city string, did int) (result []map
 			ids = append(ids, strconv.Itoa(kid))
 		}
 
-		fmt.Printf("\n\n---------------------------\n[%s]\n->%s %s %s {%s} \t\t ====> Found LN: %s\n%s \n\n", id, fn, mn, ln, city, strings.Join(ids, ","), strings.Join(n, "\n"))
+		fmt.Printf("\n\n---------------------------\n[%s]\n->%s %s %s {%s} \t\t ====> Found [did:%d]: %s\n%s \n\n", id, fn, mn, ln, city, did, strings.Join(ids, ","), strings.Join(n, "\n"))
 	} else {
 		// fmt.Printf("{q%d} [%s] %s %s %s \t\t ====> Not found\n", i, id, fn, mn, ln)
 	}

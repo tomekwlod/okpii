@@ -18,7 +18,7 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-const cdid = 1
+const cdid = "17,22,24,25,26,27,28,29,30,31,32"
 const batchInsert = 3000
 
 type service struct {
@@ -64,21 +64,26 @@ func main() {
 
 	fmt.Println("Querying for experts")
 
-	lastID := 0
-	var experts []*Experts // needs to stay here. If we do below: `err,lastID,experts := s.fetchExperts(...)` it will override id all the time instead of reusing the declared one above
+	for _, did := range strings.Split(cdid, ",") {
+		did, _ := strconv.Atoi(did)
+		fmt.Printf("Deployment: %d\n\n", did)
 
-	for {
-		// getting the experts from the MySQL
-		lastID, experts, err = s.fetchExperts(lastID, cdid, batchInsert)
-		checkErr(err)
+		lastID := 0
+		var experts []*Experts // needs to stay here. If we do below: `err,lastID,experts := s.fetchExperts(...)` it will override id all the time instead of reusing the declared one above
 
-		if len(experts) == 0 {
-			break
+		for {
+			// getting the experts from the MySQL
+			lastID, experts, err = s.fetchExperts(lastID, did, batchInsert)
+			checkErr(err)
+
+			if len(experts) == 0 {
+				break
+			}
+
+			// indexing the experts onto ES
+			err = s.indexExperts(experts)
+			checkErr(err)
 		}
-
-		// indexing the experts onto ES
-		err = s.indexExperts(experts)
-		checkErr(err)
 	}
 }
 
