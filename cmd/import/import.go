@@ -43,6 +43,7 @@ type service struct {
 }
 
 const batch = 3000
+const filename = "./dump4-sc.csv"
 
 // move me!!
 const (
@@ -79,7 +80,7 @@ func main() {
 	}
 
 	ch := make(chan []string) // one line from csv
-	go csvReader("./dump3-sc.csv", ch)
+	go csvReader(filename, ch)
 
 	var operations []mongo.WriteModel
 	headers := []string{}
@@ -153,9 +154,11 @@ func csvReader(fname string, out chan<- []string) {
 }
 
 func validateHeader(headers []string) (newHeaders []string, err error) {
-	required := []string{"SRC_CUST_ID", "CUST_NAME", "FIRST_NAME", "MIDDLE_NAME", "LAST_NAME", "SRC_FIRST_NAME", "SRC_LAST_NAME", "SRC_MIDDLE_NAME",
-		"OneKeyID_Address", "City", "ZIP", "State", "Country",
-	}
+	// required := []string{"SRC_CUST_ID", "CUST_NAME", "FIRST_NAME", "MIDDLE_NAME", "LAST_NAME", "SRC_FIRST_NAME", "SRC_LAST_NAME", "SRC_MIDDLE_NAME",
+	// 	"OneKeyID_Address", "City", "ZIP", "State", "Country",
+	// }
+	//,,CUST_NAME,FIRST_NAME,LAST_NAME,PREFIX,GENDER,CUST_TYP,CUST_SUBTYP,ADDR_LINE_1,CITY,ZIP_CD,CNTRY
+	required := []string{"SRC_CUST_ID", "CUST_NAME", "FIRST_NAME", "LAST_NAME", "CITY", "CNTRY"}
 
 	for _, header := range headers {
 		cl := Clean([]byte(header))
@@ -204,7 +207,7 @@ func (s *service) flush(operations []mongo.WriteModel) (err error) {
 	t1 := time.Now()
 
 	// defining the collection
-	collection := s.mongoDB.Collection("test")
+	collection := s.mongoDB.Collection("test2")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Second) // 10min
 	defer cancel()

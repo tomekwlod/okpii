@@ -20,15 +20,15 @@
             "properties":{
                 "fn":{
                     "type":"keyword",
-                    "normalizer":"ascii_norm"
+                    "normalizer":"ascii_lower_norm"
                 },
                 "mn":{
                     "type":"keyword",
-                    "normalizer":"ascii_norm"
+                    "normalizer":"ascii_lower_norm"
                 },
                 "ln":{
                     "type":"keyword",
-                    "normalizer":"ascii_norm"
+                    "normalizer":"ascii_lower_norm"
                 },
                 "name":{
                     "type":"text"

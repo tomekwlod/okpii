@@ -18,8 +18,8 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-const cdid = "17,22,24,25,26,27,28,29,30,31,32"
-const batchInsert = 3000
+const cdid = "9"
+const batchInsert = 1000
 
 type service struct {
 	es    *elastic.Client
@@ -71,19 +71,19 @@ func main() {
 		lastID := 0
 		var experts []*Experts // needs to stay here. If we do below: `err,lastID,experts := s.fetchExperts(...)` it will override id all the time instead of reusing the declared one above
 
-		for {
-			// getting the experts from the MySQL
-			lastID, experts, err = s.fetchExperts(lastID, did, batchInsert)
-			checkErr(err)
+		// for {
+		// getting the experts from the MySQL
+		lastID, experts, err = s.fetchExperts(lastID, did, batchInsert)
+		checkErr(err)
 
-			if len(experts) == 0 {
-				break
-			}
-
-			// indexing the experts onto ES
-			err = s.indexExperts(experts)
-			checkErr(err)
+		if len(experts) == 0 {
+			break
 		}
+
+		// indexing the experts onto ES
+		err = s.indexExperts(experts)
+		checkErr(err)
+		// }
 	}
 }
 
@@ -106,8 +106,10 @@ left join container__embase_entry cem on cem.id = kem.embase_entry_id and length
 LEFT JOIN location l ON l.id = k.default_location_id
 WHERE
 	k.deployment_id = ?
+	and l.country_name like "germany"
 	AND k.id > ?
 group by k.id
+ORDER BY r.position ASC
 LIMIT ?`, did, newID, batchLimit)
 
 	if err != nil {

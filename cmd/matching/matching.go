@@ -41,7 +41,8 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-const cdid = "15,16,17,22,24,25,26,27,28,29,30,31,32"
+const cdid = "9"
+const testOneID = "" // WDEM04092438
 
 type service struct {
 	es    *elastic.Client
@@ -86,10 +87,19 @@ func main() {
 
 		fn, mn, ln := names(m)
 
+		if testOneID != "" {
+			// to test only one person
+			if m["SRC_CUST_ID"] != testOneID {
+				continue
+			} else {
+				fmt.Printf("%s :: %s :: %s", fn, mn, ln)
+			}
+		}
+
 		for _, did := range strings.Split(cdid, ",") {
 			did, _ := strconv.Atoi(did)
 
-			queryNumber, matches := s.findMatches(did, m["SRC_CUST_ID"], m["City"], fn, mn, ln)
+			queryNumber, matches := s.findMatches(did, m["SRC_CUST_ID"], m["CUST_NAME"], m["CITY"], fn, mn, ln)
 			// _, matches := s.findMatches(did, m["SRC_CUST_ID"], m["City"], fn, mn, ln)
 
 			for _, match := range matches {
@@ -103,7 +113,7 @@ func main() {
 
 					if kid > 0 {
 						fmt.Printf("{q%d}: [%s] %s %s %s {%s}\t\t ====> \t [%d] %s, {%s} npi: %v, ttid: %v\n",
-							queryNumber, m["SRC_CUST_ID"], fn, mn, ln, m["City"],
+							queryNumber, m["SRC_CUST_ID"], fn, mn, ln, m["CITY"],
 							kid, match["name"], match["city"], match["npi"], match["ttid"],
 						)
 
@@ -127,13 +137,15 @@ func main() {
 
 func (s *service) isInOneKeyDB(fn, mn, ln string) bool {
 	// defining the collection
-	collection := s.mongo.Collection("test")
+	collection := s.mongo.Collection("test2")
 
-	// filter := bson.D{{"SRC_CUST_ID", "WDEM01690729"}}
+	if mn != "" {
+		// todo!! original name should come instead!! because of the middle names issue
+	}
+
 	filter := bson.M{
-		"SRC_FIRST_NAME":  fn,
-		"SRC_MIDDLE_NAME": mn,
-		"SRC_LAST_NAME":   ln,
+		"FIRST_NAME": fn,
+		"LAST_NAME":  ln,
 	}
 
 	// Pass these options to the Find method
@@ -152,14 +164,22 @@ func (s *service) isInOneKeyDB(fn, mn, ln string) bool {
 	// entry found, skip!
 	return false
 }
-func (s *service) countOneKeyOcc(fn, ln string) int64 {
+func (s *service) countOneKeyOcc(custName, fn, ln string) int64 {
 	// defining the collection
-	collection := s.mongo.Collection("test")
+	collection := s.mongo.Collection("test2")
 
-	// filter := bson.D{{"SRC_CUST_ID", "WDEM01690729"}}
-	filter := bson.M{
-		"SRC_FIRST_NAME": primitive.Regex{Pattern: "^" + fn + ".*", Options: ""},
-		"SRC_LAST_NAME":  ln,
+	var ifn interface{}
+	ifn = fn
+	if len(fn) == 1 {
+		ifn = primitive.Regex{Pattern: "^" + fn + ".*", Options: ""}
+	}
+
+	filter := bson.D{
+		{"FIRST_NAME", ifn},
+		{"LAST_NAME", ln},
+		{"CUST_NAME", bson.D{
+			{"$ne", custName},
+		}},
 	}
 
 	// Pass these options to the Find method
@@ -180,7 +200,7 @@ func (s *service) onekeys(out chan<- map[string]string) {
 	defer close(out)
 
 	// defining the collection
-	collection := s.mongo.Collection("test")
+	collection := s.mongo.Collection("test2")
 
 	// filter := bson.D{{"SRC_CUST_ID", "WDEM01690729"}}
 	filter := bson.D{{}}
@@ -189,12 +209,11 @@ func (s *service) onekeys(out chan<- map[string]string) {
 	options := options.Find()
 	options.SetProjection(bson.D{
 		{"_id", 0},
-		{"SRC_FIRST_NAME", 1},
-		{"SRC_MIDDLE_NAME", 1},
-		{"SRC_LAST_NAME", 1},
-		{"SRC_ORG_NAME", 1},
+		{"FIRST_NAME", 1},
+		{"LAST_NAME", 1},
+		{"CUST_NAME", 1},
 		{"SRC_CUST_ID", 1},
-		{"City", 1},
+		{"CITY", 1},
 	})
 	// options.SetLimit(10)
 
@@ -241,15 +260,15 @@ func (s *service) update(wg *sync.WaitGroup, id, did int, oneky string) (status 
 	return
 }
 
-func (s *service) findMatches(did int, id, city, fn, mn, ln string) (queryNumber int, result []map[string]interface{}) {
+func (s *service) findMatches(did int, id, custName, city, fn, mn, ln string) (queryNumber int, result []map[string]interface{}) {
 	if strings.Replace(fn, " ", "", -1) == "" {
 		// if no FN we should just continue; if causes too much hassle
 		return
 	}
 
-	for _, queryNumber = range []int{1, 2, 3, 4} {
+	for _, queryNumber = range []int{1, 2, 3, 4, 5, 6} {
 
-		result = s.search(queryNumber, id, fn, mn, ln, city, did) //deployment=XX
+		result = s.search(queryNumber, id, custName, fn, mn, ln, city, did) //deployment=XX
 
 		if len(result) == 0 {
 			// fmt.Printf("{q%d} [%s] %s %s %s \t\t ====> Not results found\n", i, id, fn, mn, ln)
@@ -264,9 +283,9 @@ func (s *service) findMatches(did int, id, city, fn, mn, ln string) (queryNumber
 }
 
 func names(m map[string]string) (fn, mn, ln string) {
-	fn = m["SRC_FIRST_NAME"]
-	mn = m["SRC_MIDDLE_NAME"]
-	ln = m["SRC_LAST_NAME"]
+	fn = m["FIRST_NAME"]
+	mn = ""
+	ln = m["LAST_NAME"]
 
 	// if no MN but a space in FN then split
 	if mn == "" {
@@ -308,30 +327,27 @@ func FirstChar(str string) (c string) {
 	return
 }
 
-func (s *service) search(option int, id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) search(option int, id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 	switch option {
 	case 1:
-		return s.simple(id, fn, mn, ln, city, did)
+		return s.simple(id, custName, fn, mn, ln, city, did)
 	case 2:
-		return s.aliases(id, fn, mn, ln, city, did)
+		return s.aliases(id, custName, fn, mn, ln, city, did)
 	case 3:
-		return s.short(id, fn, mn, ln, city, did)
+		return s.short(id, custName, fn, mn, ln, city, did)
 	case 4:
-		return s.noMiddleNameOnly(id, fn, mn, ln, city, did)
-	// case 4:
-	// 	// this is quite risky. there should be a check if only one available match!
-	// 	return s.noMiddleName(id, fn, mn, ln, city, did)
-	// // case 5:
-	// // 	return s.madnessTemp(id, fn, mn, ln, city, did)
-	// case 5:
-	// 	return s.madness2Temp(id, fn, mn, ln, city, did)
+		return s.noMiddleNameOnly(id, custName, fn, mn, ln, city, did)
+	case 5:
+		return s.oneMiddleNameOnly1(id, custName, fn, mn, ln, city, did)
+	case 6:
+		return s.oneMiddleNameOnly2(id, custName, fn, mn, ln, city, did)
 	default:
-		return s.testSearch(id, fn, mn, ln, city, did)
+		return s.testSearch(id, custName, fn, mn, ln, city, did)
 		return nil
 	}
 }
 
-func (s *service) simple(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) simple(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 	)
@@ -410,12 +426,12 @@ func (s *service) simple(id, fn, mn, ln, city string, did int) (result []map[str
 	return
 }
 
-func (s *service) aliases(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) aliases(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().
 		Filter(
 			elastic.NewMatchPhraseQuery("did", did),
 			elastic.NewMatchPhraseQuery("ln", ln),
-			MnSubQuery(mn),
+			mnSubQuery(mn),
 		)
 
 	q.Must(elastic.NewMatchPhraseQuery("aliases", fn))
@@ -464,7 +480,7 @@ func (s *service) aliases(id, fn, mn, ln, city string, did int) (result []map[st
 	return
 }
 
-func (s *service) short(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) short(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 		elastic.NewMatchPhraseQuery("ln", ln),
@@ -546,7 +562,7 @@ func (s *service) short(id, fn, mn, ln, city string, did int) (result []map[stri
 	return
 }
 
-func (s *service) noMiddleName(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) noMiddleName(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 	// {q4}: [WDEM00121088] Jana Marie Worm {ESSEN}		 ====> 	 [5597205] J Worm, {København} npi: 0, ttid: 0
 	return nil
 
@@ -616,7 +632,7 @@ func (s *service) noMiddleName(id, fn, mn, ln, city string, did int) (result []m
 	return
 }
 
-func (s *service) noMiddleNameOnly(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) noMiddleNameOnly(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 		elastic.NewMatchPhraseQuery("ln", ln),
@@ -655,9 +671,9 @@ func (s *service) noMiddleNameOnly(id, fn, mn, ln, city string, did int) (result
 	}
 
 	for _, hit := range searchResult.Hits.Hits {
-		total := s.countOneKeyOcc(FirstChar(fn), ln)
+		total := s.countOneKeyOcc(custName, FirstChar(fn), ln)
 
-		if total == 1 {
+		if total == 0 {
 			var row map[string]interface{}
 
 			err := json.Unmarshal(*hit.Source, &row)
@@ -668,94 +684,31 @@ func (s *service) noMiddleNameOnly(id, fn, mn, ln, city string, did int) (result
 			result = append(result, row)
 
 			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
+		} else {
+			fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (noMiddleNameOnly)!\n", id, fn, mn, ln, city, hit.Id)
 		}
 	}
 
 	return
 }
 
-// func (s *service) madnessTemp(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
-// 	q := elastic.NewBoolQuery().Filter(
-// 		elastic.NewMatchPhraseQuery("did", did),
-// 		elastic.NewMatchPhraseQuery("ln", ln),
-// 		// madness for now is only for NO MIDDLE NAMES pairs
-// 		elastic.NewTermQuery("mn", ""),
-// 	)
-
-// 	if mn != "" {
-// 		// this case is only for the names WITHOUT MN included
-// 		return nil
-// 	}
-
-// 	fn = strings.Replace(fn, ".", "", -1)
-
-// 	// only fn1
-// 	q.Must(elastic.NewMatchPhraseQuery("fn", FirstChar(fn)))
-
-// 	nss := elastic.NewSearchSource().Query(q)
-
-// 	searchResult, err := s.es.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	if searchResult.Hits.TotalHits == 0 {
-// 		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
-// 		return nil
-// 	}
-
-// 	if searchResult.Hits.TotalHits > 1 {
-// 		// fmt.Printf("[%s] %s %s %s \t\t ====> Too many madness results!\n", id, fn, mn, ln)
-// 		return nil
-// 	}
-
-// 	// checking if there is someone with the above fn1* + mn* + ln
-// 	// TEMPORARY disabled for the presentation purposes
-// 	// if s.madnessConflict(fn, mn, ln, cdid) {
-// 	// 	fmt.Printf(" >>>>> [%s] %s %s %s \t Madness conflict detected\n", id, fn, mn, ln)
-// 	// 	return nil
-// 	// }
-
-// 	for _, hit := range searchResult.Hits.Hits {
-// 		var row map[string]interface{}
-
-// 		err := json.Unmarshal(*hit.Source, &row)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-
-// 		result = append(result, row)
-
-// 		fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
-// 	}
-
-// 	return
-// }
-
-func (s *service) madness2Temp(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
-	// {q5}: [WDEM00089847] Thomas  Braun {MÜNCHEN}		 ====> 	 [2549379] Thomas M Braun, {Ann Arbor} npi: 0, ttid: 0
-	// {q5}: [WDEM00089847] Thomas  Braun {MÜNCHEN}		 ====> 	 [5651374] Thomas J Braun, {Denver} npi: 1.841219474e+09, ttid: 120569
-	return nil
-
+func (s *service) oneMiddleNameOnly1(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 		elastic.NewMatchPhraseQuery("ln", ln),
+		elastic.NewMatchPhraseQuery("fn", fn),
 	)
 
 	if mn != "" {
-		// this case is only for the names WITHOUT MN included
+		// this case is only for the names with NO MN included
+
+		// ---------------------------
+		// ->Ralf    Dittrich {OSNABRÜCK}             ====> Found [did:1]: 5711743
+		// 0.Ralf F. Dittrich {}
+		//
+		// We want to match this only if Ralf * Dittrich exist in OneKey Db only once!
 		return nil
 	}
-
-	fn = strings.Replace(fn, ".", "", -1)
-
-	if len(fn) == 1 {
-		return nil
-	}
-
-	// only fn1
-	q.Must(elastic.NewMatchPhraseQuery("fn", fn))
-	q.MustNot(elastic.NewTermQuery("mn", ""))
 
 	nss := elastic.NewSearchSource().Query(q)
 
@@ -769,35 +722,92 @@ func (s *service) madness2Temp(id, fn, mn, ln, city string, did int) (result []m
 		return nil
 	}
 
-	// if searchResult.Hits.TotalHits > 1 {
-	// 	// fmt.Printf("[%s] %s %s %s \t\t ====> Too many madness results!\n", id, fn, mn, ln)
-	// 	return nil
-	// }
+	if searchResult.Hits.TotalHits > 1 {
+		fmt.Printf("[%s] \t\t ====> Too many results! %s %s\n", id, fn, ln)
+		return nil
+	}
 
 	for _, hit := range searchResult.Hits.Hits {
-		var row map[string]interface{}
+		total := s.countOneKeyOcc(custName, fn, ln)
 
-		err := json.Unmarshal(*hit.Source, &row)
-		if err != nil {
-			panic(err)
+		if total == 0 {
+			var row map[string]interface{}
+
+			err := json.Unmarshal(*hit.Source, &row)
+			if err != nil {
+				panic(err)
+			}
+
+			result = append(result, row)
+
+			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
+		} else {
+			fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (oneMiddleNameOnly1)!\n", id, fn, mn, ln, city, hit.Id)
 		}
-
-		// checking if this exact mach already exists in the OneKey DB; if so: skip, otherwise: ok to go
-		if s.isInOneKeyDB(fn, mn, ln) {
-			fmt.Println(" >><< Better match found and will be used later >><<")
-
-			continue
-		}
-
-		result = append(result, row)
-
-		// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
 	}
 
 	return
 }
 
-func (s *service) testSearch(id, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) oneMiddleNameOnly2(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+	q := elastic.NewBoolQuery().Filter(
+		elastic.NewMatchPhraseQuery("did", did),
+		elastic.NewMatchPhraseQuery("ln", ln),
+		elastic.NewMatchPhraseQuery("fn", fn),
+		elastic.NewTermQuery("mn", ""),
+	)
+
+	if mn == "" {
+		// this case is only for the names with NO MN included
+
+		// ---------------------------
+		// ->Ralf F. Dittrich {OSNABRÜCK}             ====> Found [did:1]: 5711743
+		// 0.Ralf    Dittrich {}
+		//
+		// We want to match this only if Ralf * Dittrich exist in OneKey Db only once!
+		return nil
+	}
+
+	nss := elastic.NewSearchSource().Query(q)
+
+	searchResult, err := s.es.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	if searchResult.Hits.TotalHits == 0 {
+		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
+		return nil
+	}
+
+	if searchResult.Hits.TotalHits > 1 {
+		fmt.Printf("[%s] \t\t ====> Too many results! %s %s\n", id, fn, ln)
+		return nil
+	}
+
+	for _, hit := range searchResult.Hits.Hits {
+		total := s.countOneKeyOcc(custName, fn, ln)
+
+		if total == 0 {
+			var row map[string]interface{}
+
+			err := json.Unmarshal(*hit.Source, &row)
+			if err != nil {
+				panic(err)
+			}
+
+			result = append(result, row)
+
+			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
+		} else {
+			fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (oneMiddleNameOnly2)!\n", id, fn, mn, ln, city, hit.Id)
+		}
+	}
+
+	return
+}
+
+func (s *service) testSearch(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 		elastic.NewMatchPhraseQuery("ln", ln),
@@ -901,37 +911,8 @@ func (s *service) mnConflict(fn, mn, ln string, did int) bool {
 
 	return false
 }
-func (s *service) madnessConflict(fn, mn, ln string, did int) bool {
-	q := elastic.NewBoolQuery().Filter(
-		elastic.NewMatchPhraseQuery("did", did),
-		elastic.NewMatchPhraseQuery("ln", ln),
-		// elastic.NewTermQuery("mn", ""),
-	)
 
-	q.Must(elastic.NewPrefixQuery("fn", FirstChar(fn)))
-
-	nss := elastic.NewSearchSource().Query(q)
-
-	searchResult, err := s.es.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	if searchResult.Hits.TotalHits == 0 {
-		// no results, no conflicts
-		return false
-	}
-
-	if searchResult.Hits.TotalHits > 1 {
-		// no results, no conflicts
-		return true
-	}
-
-	// no conflicts
-	return false
-}
-
-func MnSubQuery(mn string) (q *elastic.BoolQuery) {
+func mnSubQuery(mn string) (q *elastic.BoolQuery) {
 	q = elastic.NewBoolQuery()
 
 	if mn == "" {
