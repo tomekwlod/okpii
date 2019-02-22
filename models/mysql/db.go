@@ -1,12 +1,22 @@
-package db
+package models
 
 import (
 	"database/sql"
 	"fmt"
 	"os"
+	"sync"
 )
 
-func MysqlClient() (db *sql.DB, err error) {
+type Repository interface {
+	AddOnekeyToKOL(wg *sync.WaitGroup, id, did int, oneky string) (int64, error)
+	FetchExperts(id, did, batchLimit int) (int, []*Experts, error)
+}
+
+type DB struct {
+	*sql.DB
+}
+
+func MysqlClient() (*DB, error) {
 	user := os.Getenv("MYSQL_USER")
 	if user == "" {
 		user = "user"
@@ -34,9 +44,9 @@ func MysqlClient() (db *sql.DB, err error) {
 		user, pass, host, port, dbname,
 	)
 
-	db, err = sql.Open("mysql", set)
+	db, err := sql.Open("mysql", set)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	//defer in main body methods
@@ -45,10 +55,10 @@ func MysqlClient() (db *sql.DB, err error) {
 	// Open doesn't open a connection. Validate DSN data:
 	err = db.Ping()
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	fmt.Println("Connection to MySQL established")
 
-	return
+	return &DB{db}, nil
 }

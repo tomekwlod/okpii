@@ -7,7 +7,6 @@ Imports a CSV file to MongoDB database
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -16,7 +15,8 @@ import (
 
 	"github.com/mongodb/mongo-go-driver/bson"
 	"github.com/mongodb/mongo-go-driver/mongo"
-	"github.com/tomekwlod/okpii/db"
+
+	modelsMongodb "github.com/tomekwlod/okpii/models/mongodb"
 )
 
 /*
@@ -39,7 +39,7 @@ https://www.mongodb.com/blog/post/mongodb-go-driver-tutorial
 */
 
 type service struct {
-	mongoDB *mongo.Database
+	mongo modelsMongodb.Repository
 }
 
 const batch = 3000
@@ -69,14 +69,14 @@ func main() {
 	t1 := time.Now()
 
 	// definging the mongodb session
-	database, err := db.MongoDB()
+	db, err := modelsMongodb.MongoDB()
 	if err != nil {
 		panic(err)
 	}
 
 	// combine the datastore session and the logger into one struct
 	s := &service{
-		mongoDB: database,
+		mongo: db,
 	}
 
 	ch := make(chan []string) // one line from csv
@@ -109,7 +109,7 @@ func main() {
 		operations = append(operations, operation)
 
 		if len(operations) >= batch {
-			err := s.flush(operations)
+			err := s.mongo.Flush(operations)
 			if err != nil {
 				panic(err)
 			}
@@ -119,7 +119,7 @@ func main() {
 		}
 	}
 
-	err = s.flush(operations)
+	err = s.mongo.Flush(operations)
 	if err != nil {
 		panic(err)
 	}
@@ -200,26 +200,4 @@ func consolidateWithHeader(headers, line []string) map[string]string {
 	}
 
 	return m
-}
-
-func (s *service) flush(operations []mongo.WriteModel) (err error) {
-	t1 := time.Now()
-
-	// defining the collection
-	collection := s.mongoDB.Collection("test2")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Second) // 10min
-	defer cancel()
-	bwr, err := collection.BulkWrite(ctx, operations)
-	if err != nil {
-		return
-	}
-
-	t2 := time.Now()
-
-	fmt.Printf("Inserted: %d, Upserted %d, Modified: %d, Matched: %d, \nDone in: %v \n",
-		bwr.InsertedCount, bwr.UpsertedCount, bwr.ModifiedCount, bwr.MatchedCount, t2.Sub(t1),
-	)
-
-	return
 }

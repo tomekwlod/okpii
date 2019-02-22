@@ -1,16 +1,35 @@
-package db
+package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 
+	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
 	"github.com/tomekwlod/utils"
 	elastic "gopkg.in/olivere/elastic.v6"
 )
+
+type Repository interface {
+	// searches
+	SimpleSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
+	ShortSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
+	NoMiddleNameSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
+	OneMiddleNameSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
+	OneMiddleNameSearch2(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
+	TestSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
+
+	// index
+	IndexExperts(experts []*modelsMysql.Experts, batchInsert int) error
+}
+
+type DB struct {
+	*elastic.Client
+}
 
 type esConfig struct {
 	Addr       string
@@ -18,25 +37,24 @@ type esConfig struct {
 	UseSniffer bool
 }
 
-func ESClient() (client *elastic.Client, err error) {
+func ESClient() (*DB, error) {
 	ec := esConfig{"localhost", 9202, false}
 
 	// Create ES client here; If no connection - nothing to do here
-	client, err = newESClient(ec)
+	db, err := newESClient(ec)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	// Create mapping
-	err = createIndex(client, "experts")
+	err = createIndex(db, "experts")
 	if err != nil {
-		fmt.Println(err) //just temp - remove me later
-		return
+		return nil, err
 	}
 
 	fmt.Println("Connection to ElasticServer established")
 
-	return
+	return &DB{db}, nil
 }
 
 func newESClient(ec esConfig) (client *elastic.Client, err error) {
@@ -104,4 +122,17 @@ func createIndex(client *elastic.Client, index string) (err error) {
 	}
 
 	return
+}
+
+func PrintESQuery(nss *elastic.SearchSource) {
+	sjson, err := nss.Source()
+	if err != nil {
+		panic(err)
+	}
+	data, err := json.MarshalIndent(sjson, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("%s\n", string(data))
 }

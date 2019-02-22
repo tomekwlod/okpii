@@ -1,4 +1,4 @@
-package db
+package models
 
 import (
 	"context"
@@ -10,7 +10,19 @@ import (
 	"github.com/mongodb/mongo-go-driver/mongo/readpref"
 )
 
-func MongoDB() (database *mongo.Database, err error) {
+type Repository interface {
+	Onekeys(out chan<- map[string]string)
+	CountOneKeyOcc(custName, fn, ln string) int64
+	IsInOneKeyDB(fn, mn, ln string) bool
+
+	Flush(operations []mongo.WriteModel) error
+}
+
+type DB struct {
+	*mongo.Database
+}
+
+func MongoDB() (*DB, error) {
 	host := os.Getenv("MONGO_HOST")
 	if host == "" {
 		host = "localhost"
@@ -26,24 +38,24 @@ func MongoDB() (database *mongo.Database, err error) {
 
 	client, err := mongo.NewClient("mongodb://" + host + ":" + port)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	err = client.Connect(ctx)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	ctx, _ = context.WithTimeout(context.Background(), 2*time.Second)
 	err = client.Ping(ctx, readpref.Primary())
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	fmt.Println("Connection to MongoDB established")
 
-	database = client.Database(dbname)
+	db := client.Database(dbname)
 
-	return
+	return &DB{db}, nil
 }
