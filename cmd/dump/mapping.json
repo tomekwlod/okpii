@@ -11,6 +11,11 @@
                     "type": "custom",
                     "char_filter": [],
                     "filter":["lowercase", "asciifolding"]
+                },
+                "ascii_lower_german_norm":{
+                    "type": "custom",
+                    "char_filter": [],
+                    "filter":["lowercase", "asciifolding", "german_normalization"]
                 }
             }
         }
@@ -28,14 +33,26 @@
                 },
                 "ln":{
                     "type":"keyword",
-                    "normalizer":"ascii_lower_norm"
+                    "normalizer":"ascii_lower_norm",
+                    "fields":{
+                        "german": {
+                            "type":"keyword",
+                            "normalizer":"ascii_lower_german_norm"
+                        }
+                    }
                 },
                 "name":{
                     "type":"text"
                 },
                 "nameKeyword":{
                     "type":"keyword",
-                    "normalizer":"ascii_norm"
+                    "normalizer":"ascii_norm",
+                    "fields":{
+                        "german": {
+                            "type":"keyword",
+                            "normalizer":"ascii_lower_german_norm"
+                        }
+                    }
                 },
                 "nameKeywordSquash":{
                     "type":"keyword",
@@ -46,7 +63,8 @@
                     "normalizer":"ascii_lower_norm"
                 },
                 "aliases":{
-                    "type":"keyword"
+                    "type":"keyword",
+                    "normalizer":"ascii_lower_norm"
                 },
                 "city":{
                     "type":"keyword"

@@ -2,6 +2,14 @@ package main
 
 /**
 
+MATCHING UMLAUT!!
+https://discuss.elastic.co/t/u-umlaut-search-indexing-user-name-muller-search-fails-for-muller-but-success-for-muller/60317/5
+https://discuss.elastic.co/t/folding-german-characters-like-umlauts/3720/7
+Kai Hübel <-- in onkey
+1262013: Kai Huebel <-- mysql
+1267961: Kai Hübel <-- mysql
+
+
 Problem.1.
 Below matching works per deployment. Since we have 22 deployments maybe it is better to ask only once and collect the matches for all the deployments.
 But we have to also keep in mind that if we have a match through the simpleQuery we won't go any further and we may loose some not perfect matches. So either
@@ -42,7 +50,8 @@ import (
 )
 
 const cdid = "9"
-const testOneID = "" // WDEM04092438
+const testOneID = ""
+const collectFromEveryStep = true
 
 type service struct {
 	es    *elastic.Client
@@ -99,34 +108,31 @@ func main() {
 		for _, did := range strings.Split(cdid, ",") {
 			did, _ := strconv.Atoi(did)
 
-			queryNumber, matches := s.findMatches(did, m["SRC_CUST_ID"], m["CUST_NAME"], m["CITY"], fn, mn, ln)
+			result := s.findMatches(did, m["SRC_CUST_ID"], m["CUST_NAME"], m["CITY"], fn, mn, ln)
 			// _, matches := s.findMatches(did, m["SRC_CUST_ID"], m["City"], fn, mn, ln)
 
-			for _, match := range matches {
-				if match["id"] != nil {
-					kid64 := match["id"].(float64)
-					kid := int(kid64)
+			for queryNumber, matches := range result {
+				for _, match := range matches {
+					if match["id"] != nil {
+						kid64 := match["id"].(float64)
+						kid := int(kid64)
 
-					// if queryNumber != 4 {
-					// 	continue
-					// }
+						if kid > 0 {
+							fmt.Printf("{q%d}: [%s] %s %s %s {%s}\t\t ====> \t [%d] %s, {%s} npi: %v, ttid: %v\n",
+								queryNumber, m["SRC_CUST_ID"], fn, mn, ln, m["CITY"],
+								kid, match["name"], match["city"], match["npi"], match["ttid"],
+							)
 
-					if kid > 0 {
-						fmt.Printf("{q%d}: [%s] %s %s %s {%s}\t\t ====> \t [%d] %s, {%s} npi: %v, ttid: %v\n",
-							queryNumber, m["SRC_CUST_ID"], fn, mn, ln, m["CITY"],
-							kid, match["name"], match["city"], match["npi"], match["ttid"],
-						)
+							wg.Add(1)
+							go s.update(&wg, kid, did, m["SRC_CUST_ID"])
 
-						wg.Add(1)
-						go s.update(&wg, kid, did, m["SRC_CUST_ID"])
-
-					} else {
-						fmt.Println("ID NOT VALID ", match["id"], kid)
+						} else {
+							fmt.Println("ID NOT VALID ", match["id"], kid)
+						}
 					}
 				}
 			}
 		}
-
 	}
 
 	t2 := time.Now()
@@ -260,23 +266,50 @@ func (s *service) update(wg *sync.WaitGroup, id, did int, oneky string) (status 
 	return
 }
 
-func (s *service) findMatches(did int, id, custName, city, fn, mn, ln string) (queryNumber int, result []map[string]interface{}) {
+// func (s *service) findMatches(did int, id, custName, city, fn, mn, ln string) (queryNumber int, result []map[string]interface{}) {
+func (s *service) findMatches(did int, id, custName, city, fn, mn, ln string) (result map[int][]map[string]interface{}) {
+	// this cannot seat in the return definition because it will panic below [assignment to entry in nil map]
+	result = map[int][]map[string]interface{}{}
+
 	if strings.Replace(fn, " ", "", -1) == "" {
-		// if no FN we should just continue; if causes too much hassle
+		// if no FN we should just continue; it causes too much hassle
 		return
 	}
 
-	for _, queryNumber = range []int{1, 2, 3, 4, 5, 6} {
+	var ids []string
+	var midres []map[string]interface{}
 
-		result = s.search(queryNumber, id, custName, fn, mn, ln, city, did) //deployment=XX
+	for _, queryNumber := range []int{1, 2, 3, 4, 5, 6} {
 
-		if len(result) == 0 {
-			// fmt.Printf("{q%d} [%s] %s %s %s \t\t ====> Not results found\n", i, id, fn, mn, ln)
+		midres = s.search(queryNumber, id, custName, fn, mn, ln, city, did, ids) //deployment=XX
 
-			continue
+		// before it was a return inside this for loop when we had a match
+		// i introduced another for underneath to append all the results from every search step
+		// this may bring more matches but at the same time it is more risky
+		//
+		// the const collectFromEveryStep=false is to switch off this behaviour if needed
+
+		if collectFromEveryStep == false {
+			if len(midres) == 0 {
+				// no results here, continue with another search
+				continue
+			}
+
+			for _, row := range midres {
+				result[queryNumber] = append(result[queryNumber], row)
+			}
+
+			// a match -> return with the matches from one search only
+			return
 		}
 
-		return
+		// this can happen only if const collectFromEveryStep=true -> so it will collect the results from
+		// every single search step
+		for _, row := range midres {
+			ids = append(ids, strconv.FormatFloat(row["id"].(float64), 'f', 0, 64))
+
+			result[queryNumber] = append(result[queryNumber], row)
+		}
 	}
 
 	return
@@ -327,30 +360,36 @@ func FirstChar(str string) (c string) {
 	return
 }
 
-func (s *service) search(option int, id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) search(option int, id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	switch option {
 	case 1:
-		return s.simple(id, custName, fn, mn, ln, city, did)
+		return s.simple(id, custName, fn, mn, ln, city, did, exclIDs)
 	case 2:
-		return s.aliases(id, custName, fn, mn, ln, city, did)
+		return s.aliases(id, custName, fn, mn, ln, city, did, exclIDs)
 	case 3:
-		return s.short(id, custName, fn, mn, ln, city, did)
+		return s.short(id, custName, fn, mn, ln, city, did, exclIDs)
 	case 4:
-		return s.noMiddleNameOnly(id, custName, fn, mn, ln, city, did)
+		return s.noMiddleNameOnly(id, custName, fn, mn, ln, city, did, exclIDs)
 	case 5:
-		return s.oneMiddleNameOnly1(id, custName, fn, mn, ln, city, did)
+		return s.oneMiddleNameOnly1(id, custName, fn, mn, ln, city, did, exclIDs)
 	case 6:
-		return s.oneMiddleNameOnly2(id, custName, fn, mn, ln, city, did)
+		return s.oneMiddleNameOnly2(id, custName, fn, mn, ln, city, did, exclIDs)
 	default:
-		return s.testSearch(id, custName, fn, mn, ln, city, did)
+		return s.testSearch(id, custName, fn, mn, ln, city, did, exclIDs)
 		return nil
 	}
 }
 
-func (s *service) simple(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) simple(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 	)
+
+	if len(exclIDs) > 0 {
+		for _, ID := range exclIDs {
+			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
+		}
+	}
 
 	mnstr := " "
 	mn1 := ""
@@ -365,6 +404,7 @@ func (s *service) simple(id, custName, fn, mn, ln, city string, did int) (result
 
 	// John Mark Smith || Brian Surni <- with ASCII-folding
 	q.Should(elastic.NewTermQuery("nameKeyword", name))
+	q.Should(elastic.NewTermQuery("nameKeyword.german", name))
 	// JohnMarkSmith || BrianSurni    <- with ASCII-folding
 	q.Should(elastic.NewTermQuery("nameKeywordSquash", nameRaw))
 	// JohnMarkSmith || BrianSurni    <- with ASCII-folding & lowercase
@@ -426,13 +466,20 @@ func (s *service) simple(id, custName, fn, mn, ln, city string, did int) (result
 	return
 }
 
-func (s *service) aliases(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
-	q := elastic.NewBoolQuery().
-		Filter(
-			elastic.NewMatchPhraseQuery("did", did),
-			elastic.NewMatchPhraseQuery("ln", ln),
-			mnSubQuery(mn),
-		)
+func (s *service) aliases(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	q := elastic.NewBoolQuery().Filter(
+		elastic.NewMatchPhraseQuery("did", did),
+		mnSubQuery(mn),
+	).Should(
+		elastic.NewMatchPhraseQuery("ln", ln),
+		elastic.NewMatchPhraseQuery("ln.german", ln),
+	).MinimumShouldMatch("1")
+
+	if len(exclIDs) > 0 {
+		for _, ID := range exclIDs {
+			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
+		}
+	}
 
 	q.Must(elastic.NewMatchPhraseQuery("aliases", fn))
 
@@ -480,15 +527,25 @@ func (s *service) aliases(id, custName, fn, mn, ln, city string, did int) (resul
 	return
 }
 
-func (s *service) short(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
-	q := elastic.NewBoolQuery().Filter(
-		elastic.NewMatchPhraseQuery("did", did),
-		elastic.NewMatchPhraseQuery("ln", ln),
-	)
+func (s *service) short(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	q := elastic.NewBoolQuery().
+		Filter(
+			elastic.NewMatchPhraseQuery("did", did),
+		).
+		Should(
+			elastic.NewMatchPhraseQuery("ln", ln),
+			elastic.NewMatchPhraseQuery("ln.german", ln),
+		).MinimumShouldMatch("1")
 
 	if mn == "" {
 		// this case is only for the names with MN included
 		return nil
+	}
+
+	if len(exclIDs) > 0 {
+		for _, ID := range exclIDs {
+			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
+		}
 	}
 
 	fn = strings.Replace(fn, ".", "", -1)
@@ -511,6 +568,7 @@ func (s *service) short(id, custName, fn, mn, ln, city string, did int) (result 
 
 	fn1q := elastic.NewBoolQuery()
 	fn1q.Should(elastic.NewMatchPhraseQuery("fn", fn))
+	fn1q.Should(elastic.NewMatchPhraseQuery("aliases", fn))
 	if fnl > 1 {
 		fn1q.Should(elastic.NewMatchPhraseQuery("fn", FirstChar(fn)))
 	}
@@ -562,82 +620,14 @@ func (s *service) short(id, custName, fn, mn, ln, city string, did int) (result 
 	return
 }
 
-func (s *service) noMiddleName(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
-	// {q4}: [WDEM00121088] Jana Marie Worm {ESSEN}		 ====> 	 [5597205] J Worm, {København} npi: 0, ttid: 0
-	return nil
-
+func (s *service) noMiddleNameOnly(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
-		elastic.NewMatchPhraseQuery("ln", ln),
 		elastic.NewTermQuery("mn", ""),
-	)
-
-	if mn == "" {
-		// this case is only for the names with MN included
-		return nil
-	}
-
-	fn = strings.Replace(fn, ".", "", -1)
-	mn = strings.Replace(mn, ".", "", -1)
-
-	fnl := len(fn)
-	mnl := len(mn)
-
-	if fnl <= 1 && mnl <= 1 {
-		// nothing to do if short names already; squash would do the job
-		return nil
-	}
-
-	fn1q := elastic.NewBoolQuery()
-	fn1q.Should(elastic.NewMatchPhraseQuery("fn", fn))
-	if fnl > 1 {
-		fn1q.Should(elastic.NewMatchPhraseQuery("fn", FirstChar(fn)))
-	}
-	fn1q.MinimumShouldMatch("1")
-
-	q.Must(fn1q)
-
-	nss := elastic.NewSearchSource().Query(q)
-
-	searchResult, err := s.es.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	if searchResult.Hits.TotalHits == 0 {
-		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
-		return nil
-	}
-
-	// checking if there is someone with the above firstnames but with different middlenames!!
-	if s.mnConflict(fn, mn, ln, did) {
-		// fmt.Printf(" >>>>> [%s] %s %s %s \t Middle names conflict detected\n", id, fn, mn, ln)
-
-		return nil
-	}
-
-	for _, hit := range searchResult.Hits.Hits {
-		var row map[string]interface{}
-
-		err := json.Unmarshal(*hit.Source, &row)
-		if err != nil {
-			panic(err)
-		}
-
-		result = append(result, row)
-
-		// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
-	}
-
-	return
-}
-
-func (s *service) noMiddleNameOnly(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
-	q := elastic.NewBoolQuery().Filter(
-		elastic.NewMatchPhraseQuery("did", did),
+	).Should(
 		elastic.NewMatchPhraseQuery("ln", ln),
-		elastic.NewTermQuery("mn", ""),
-	)
+		elastic.NewMatchPhraseQuery("ln.german", ln),
+	).MinimumShouldMatch("1")
 
 	if mn != "" {
 		// this case is only for the names with NO MN included
@@ -651,6 +641,13 @@ func (s *service) noMiddleNameOnly(id, custName, fn, mn, ln, city string, did in
 		return nil
 	}
 
+	if len(exclIDs) > 0 {
+		for _, ID := range exclIDs {
+			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
+		}
+	}
+
+	// fn exactly fn1
 	q.Must(elastic.NewMatchPhraseQuery("fn", FirstChar(fn)))
 
 	nss := elastic.NewSearchSource().Query(q)
@@ -685,19 +682,27 @@ func (s *service) noMiddleNameOnly(id, custName, fn, mn, ln, city string, did in
 
 			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
 		} else {
-			fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (noMiddleNameOnly)!\n", id, fn, mn, ln, city, hit.Id)
+			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (noMiddleNameOnly)!\n", id, fn, mn, ln, city, hit.Id)
 		}
 	}
 
 	return
 }
 
-func (s *service) oneMiddleNameOnly1(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) oneMiddleNameOnly1(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
+	).Should(
 		elastic.NewMatchPhraseQuery("ln", ln),
+		elastic.NewMatchPhraseQuery("ln.german", ln),
+	).MinimumShouldMatch("1")
+
+	fnq := elastic.NewBoolQuery().Should(
+		elastic.NewMatchPhraseQuery("aliases", fn),
 		elastic.NewMatchPhraseQuery("fn", fn),
 	)
+	fnq.Should().MinimumShouldMatch("1")
+	q.Must(fnq)
 
 	if mn != "" {
 		// this case is only for the names with NO MN included
@@ -710,6 +715,12 @@ func (s *service) oneMiddleNameOnly1(id, custName, fn, mn, ln, city string, did 
 		return nil
 	}
 
+	if len(exclIDs) > 0 {
+		for _, ID := range exclIDs {
+			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
+		}
+	}
+
 	nss := elastic.NewSearchSource().Query(q)
 
 	searchResult, err := s.es.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
@@ -723,7 +734,7 @@ func (s *service) oneMiddleNameOnly1(id, custName, fn, mn, ln, city string, did 
 	}
 
 	if searchResult.Hits.TotalHits > 1 {
-		fmt.Printf("[%s] \t\t ====> Too many results! %s %s\n", id, fn, ln)
+		// fmt.Printf("[%s] \t\t ====> Too many results! (oneMiddleNameOnly1) %s %s\n", id, fn, ln)
 		return nil
 	}
 
@@ -742,20 +753,26 @@ func (s *service) oneMiddleNameOnly1(id, custName, fn, mn, ln, city string, did 
 
 			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
 		} else {
-			fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (oneMiddleNameOnly1)!\n", id, fn, mn, ln, city, hit.Id)
+			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (oneMiddleNameOnly1)!\n", id, fn, mn, ln, city, hit.Id)
 		}
 	}
 
 	return
 }
 
-func (s *service) oneMiddleNameOnly2(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) oneMiddleNameOnly2(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
-		elastic.NewMatchPhraseQuery("ln", ln),
-		elastic.NewMatchPhraseQuery("fn", fn),
 		elastic.NewTermQuery("mn", ""),
-	)
+	).Should(
+		elastic.NewMatchPhraseQuery("ln", ln),
+		elastic.NewMatchPhraseQuery("ln.german", ln),
+	).MinimumShouldMatch("1")
+
+	q.Should(
+		elastic.NewMatchPhraseQuery("aliases", fn),
+		elastic.NewMatchPhraseQuery("fn", fn),
+	).MinimumShouldMatch("1")
 
 	if mn == "" {
 		// this case is only for the names with NO MN included
@@ -768,6 +785,12 @@ func (s *service) oneMiddleNameOnly2(id, custName, fn, mn, ln, city string, did 
 		return nil
 	}
 
+	if len(exclIDs) > 0 {
+		for _, ID := range exclIDs {
+			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
+		}
+	}
+
 	nss := elastic.NewSearchSource().Query(q)
 
 	searchResult, err := s.es.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
@@ -781,7 +804,7 @@ func (s *service) oneMiddleNameOnly2(id, custName, fn, mn, ln, city string, did 
 	}
 
 	if searchResult.Hits.TotalHits > 1 {
-		fmt.Printf("[%s] \t\t ====> Too many results! %s %s\n", id, fn, ln)
+		// fmt.Printf("[%s] \t\t ====> Too many results! (oneMiddleNameOnly2) %s %s\n", id, fn, ln)
 		return nil
 	}
 
@@ -800,14 +823,14 @@ func (s *service) oneMiddleNameOnly2(id, custName, fn, mn, ln, city string, did 
 
 			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
 		} else {
-			fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (oneMiddleNameOnly2)!\n", id, fn, mn, ln, city, hit.Id)
+			// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] TOO MANY (oneMiddleNameOnly2)!\n", id, fn, mn, ln, city, hit.Id)
 		}
 	}
 
 	return
 }
 
-func (s *service) testSearch(id, custName, fn, mn, ln, city string, did int) (result []map[string]interface{}) {
+func (s *service) testSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 		elastic.NewMatchPhraseQuery("ln", ln),

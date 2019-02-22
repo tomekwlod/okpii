@@ -157,7 +157,6 @@ func validateHeader(headers []string) (newHeaders []string, err error) {
 	// required := []string{"SRC_CUST_ID", "CUST_NAME", "FIRST_NAME", "MIDDLE_NAME", "LAST_NAME", "SRC_FIRST_NAME", "SRC_LAST_NAME", "SRC_MIDDLE_NAME",
 	// 	"OneKeyID_Address", "City", "ZIP", "State", "Country",
 	// }
-	//,,CUST_NAME,FIRST_NAME,LAST_NAME,PREFIX,GENDER,CUST_TYP,CUST_SUBTYP,ADDR_LINE_1,CITY,ZIP_CD,CNTRY
 	required := []string{"SRC_CUST_ID", "CUST_NAME", "FIRST_NAME", "LAST_NAME", "CITY", "CNTRY"}
 
 	for _, header := range headers {
