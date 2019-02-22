@@ -80,55 +80,11 @@ func main() {
 		}
 
 		// indexing the experts onto ES
-		err = s.es.IndexExperts(experts)
+		err = s.es.IndexExperts(experts, batchInsert)
 		checkErr(err)
 		// }
 	}
 }
-
-// func transform(rows *sql.Rows) (e *Experts, err error) {
-// 	var id, did int // if nullable then if should be sql.NullInt64
-// 	var npi, ttid, position sql.NullInt64
-// 	var fn, mn, ln, city, country sql.NullString // not just string here because of nulls
-// 	var fn1, fn2, fn3, fn4 sql.NullString
-
-// 	err = rows.Scan(&id, &fn, &ln, &mn, &npi, &ttid, &did, &position, &city, &country, &fn1, &fn2, &fn3, &fn4)
-// 	if err != nil {
-// 		return
-// 	}
-
-// 	aliases := mergeAliases(fn1, fn2, fn3, fn4)
-
-// 	mnstr := " "
-// 	if mn.String != "" {
-// 		mnstr = " " + mn.String + " "
-// 	}
-// 	name := "" + fn.String + mnstr + ln.String
-// 	squash := strings.Replace(strings.Replace(name, "-", "", -1), " ", "", -1)
-
-// 	e = &Experts{
-// 		ID:                id,
-// 		Did:               did,
-// 		NPI:               int(npi.Int64),
-// 		TTID:              int(ttid.Int64),
-// 		Fn:                fn.String,
-// 		Mn:                mn.String,
-// 		Ln:                ln.String,
-// 		Name:              name,
-// 		NameKeyword:       name,
-// 		NameKeywordSquash: squash,
-// 		NameKeywordRaw:    squash,
-// 		Deleted:           0,
-// 		FNDash:            strings.Contains(fn.String, "-"),
-// 		FNDot:             strings.Contains(fn.String, "."),
-// 		Position:          int(position.Int64),
-// 		City:              city.String,
-// 		Country:           country.String,
-// 		Aliases:           aliases,
-// 	}
-
-// 	return
-// }
 
 func checkErr(err error) {
 	if err != nil {
