@@ -5,8 +5,11 @@ WORKDIR ${WORKDIR}
 COPY . .
 RUN go get -u github.com/golang/dep/cmd/dep \
     && dep init && dep ensure \
-    && cd ${WORKDIR}/cmd/matching \
-    && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o matching .
+    && cd ${WORKDIR}/cmd/dump \
+    && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dump . \
+    && cd .. \
+    && cd ${WORKDIR}/cmd/import \
+    && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o import .
 
 # # Second step - copying the files and running the exec
  FROM alpine:3.8
