@@ -16,3 +16,4 @@
 deployments/.env
 cmd/*/*.csv
 data/*
+cmd/test/*

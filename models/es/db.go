@@ -38,7 +38,17 @@ type esConfig struct {
 }
 
 func ESClient() (*DB, error) {
-	ec := esConfig{"localhost", 9202, false}
+	host := os.Getenv("ES_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	port := os.Getenv("ES_PORT")
+	if port == "" {
+		port = "9202"
+	}
+	iport, _ := strconv.Atoi(port)
+
+	ec := esConfig{host, iport, false}
 
 	// Create ES client here; If no connection - nothing to do here
 	db, err := newESClient(ec)

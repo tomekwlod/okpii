@@ -37,7 +37,7 @@ services:
         volumes:
             - ../data/es:/usr/share/elasticsearch/data
         ports:
-            - 9202:9200
+            - ${ES_EXT_PORT}:${ES_PORT}
 networks:
     default:
         driver: bridge

@@ -43,12 +43,11 @@ import (
 	_ "golang.org/x/net/html/charset"
 )
 
-const cdid = "9"
+const cdid = "1,2,3,9,10,11,12,13,14,15,16,17,22,24,25,26,27,28,29,30,31,32"
 const testOneID = ""
 const collectFromEveryStep = true
 
 type service struct {
-	// es    *elastic.Client
 	es    modelsES.Repository
 	mysql modelsMysql.Repository
 	mongo modelsMongodb.Repository
