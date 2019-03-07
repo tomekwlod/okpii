@@ -18,8 +18,3 @@ RUN go get -u github.com/golang/dep/cmd/dep \
 
  COPY --from=builder /go/src/app/cmd/dump/dump .
  COPY --from=builder /go/src/app/cmd/import/import .
-# COPY --from=builder /go/src/app/configs/parameters.yml configs/parameters.yml
-
-# # ENV CONFIG_PATH /root/configs
-
-# CMD ["./ping"]

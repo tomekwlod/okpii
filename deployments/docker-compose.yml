@@ -6,13 +6,23 @@
 version: '3'
 
 services:
-    go-cli:
-        container_name: ${CLI_NAME}
+    go-dump:
+        container_name: okpii_dump
         build:
             context: ../
-            dockerfile: ./deployments/cli/Dockerfile
-        volumes:
-            - ../log:/root/log
+            dockerfile: ./deployments/dump/Dockerfile
+        # volumes:
+        #     - ../:/go/src/app
+        env_file:
+            - .env
+    go-import:
+        container_name: okpii_import
+        build:
+            context: ../
+            dockerfile: ./deployments/import/Dockerfile
+        # command: filename
+        # volumes:
+        #     - ../:/go/src/app
         env_file:
             - .env
     elasticsearch:
