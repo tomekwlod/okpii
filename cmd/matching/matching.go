@@ -36,7 +36,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/tomekwlod/okpii/internal"
+	internal "github.com/tomekwlod/okpii/internal/app"
 	modelsES "github.com/tomekwlod/okpii/models/es"
 	modelsMongodb "github.com/tomekwlod/okpii/models/mongodb"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"

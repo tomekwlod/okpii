@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/tomekwlod/okpii/internal"
+	internal "github.com/tomekwlod/okpii/internal/app"
 	modelsES "github.com/tomekwlod/okpii/models/es"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
 
