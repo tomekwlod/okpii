@@ -36,10 +36,10 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	internal "github.com/tomekwlod/okpii/internal/app"
 	modelsES "github.com/tomekwlod/okpii/models/es"
 	modelsMongodb "github.com/tomekwlod/okpii/models/mongodb"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
+	"github.com/tomekwlod/okpii/tools"
 	strutils "github.com/tomekwlod/utils/strings"
 	_ "golang.org/x/net/html/charset"
 )
@@ -56,7 +56,7 @@ type service struct {
 
 func main() {
 
-	deployments, err := internal.Deployments()
+	deployments, err := tools.Deployments()
 	if err != nil {
 		panic(err)
 	}

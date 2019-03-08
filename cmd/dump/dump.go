@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"strconv"
 
-	internal "github.com/tomekwlod/okpii/internal/app"
 	modelsES "github.com/tomekwlod/okpii/models/es"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
+	"github.com/tomekwlod/okpii/tools"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "golang.org/x/net/html/charset"
@@ -48,7 +48,7 @@ type Experts struct {
 
 func main() {
 
-	deployments, err := internal.Deployments()
+	deployments, err := tools.Deployments()
 	if err != nil {
 		panic(err)
 	}
