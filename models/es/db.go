@@ -116,7 +116,7 @@ func createIndex(client *elastic.Client, index string) (err error) {
 	fmt.Println("No mapping found. Creating one")
 
 	// Create a new index
-	file, err := utils.ReadWholeFile("./mapping.json")
+	file, err := utils.ReadWholeFile("./static/mapping.json")
 	if err != nil {
 		return
 	}

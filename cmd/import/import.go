@@ -2,7 +2,7 @@ package main
 
 /*
 IMPORT
-Imports a CSV file to MongoDB database
+Imports a CSV file into MongoDB database
 */
 
 import (
@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/tomekwlod/utils"
 
 	"github.com/mongodb/mongo-go-driver/bson"
 	"github.com/mongodb/mongo-go-driver/mongo"
@@ -43,7 +45,7 @@ type service struct {
 }
 
 const batch = 3000
-const filename = "./dump4-sc.csv"
+const filename = "./static/file.csv"
 
 // move me!!
 const (
@@ -65,6 +67,31 @@ func Clean(b []byte) []byte {
 }
 
 func main() {
+	file := filename
+
+	// export below as a RequireFile(filename string) function
+	for {
+		fileok := utils.DoesFileExist(file)
+
+		if !fileok {
+			yes := utils.AskForConfirmation("\nFile " + file + " couldn't be determined.\nEither you:\n(n) break and upload file yourself or\n(y) continue and pass the file path ")
+
+			if !yes {
+				// manual upload; return and exit!
+				return
+			}
+
+			var fi string
+			fmt.Print("Type a new file path: ")
+			fmt.Scanln(&fi)
+
+			file = fi
+		} else {
+			break
+		}
+	}
+
+	fmt.Printf("\nFile %s looks ok! Processing...\n\n", file)
 
 	t1 := time.Now()
 

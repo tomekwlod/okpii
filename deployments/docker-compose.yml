@@ -11,8 +11,8 @@ services:
         build:
             context: ../
             dockerfile: ./deployments/dump/Dockerfile
-        # volumes:
-        #     - ../:/go/src/app
+        volumes:
+            - ../data/static:/root/static
         env_file:
             - .env
     go-import:
@@ -22,7 +22,7 @@ services:
             dockerfile: ./deployments/import/Dockerfile
         # command: filename
         volumes:
-            - ../static:/root/static
+            - ../data/static:/root/static
         env_file:
             - .env
     elasticsearch:

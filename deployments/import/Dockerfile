@@ -1,5 +1,5 @@
 # First step - just building the go app
-FROM golang:1.11.5 as ibuilder
+FROM golang:1.11.5 as builder
 
 ENV WORKDIR /go/src/app
 
@@ -15,6 +15,6 @@ FROM alpine:3.8
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 
-COPY --from=ibuilder /go/src/app/cmd/import/import .
+COPY --from=builder /go/src/app/cmd/import/import .
 
-CMD [ "./import" ]
+# CMD [ "./import" ]

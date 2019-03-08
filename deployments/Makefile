@@ -19,10 +19,10 @@ rebuild:
 
 
 godump:
-	docker-compose run --rm  go-dump
+	docker-compose run --rm go-dump
 
 goimport:
-	docker-compose run --rm  go-import
+	docker-compose run --rm go-import
 
 # Run below to populate the ENVs in dev (DO NOT RUN IT IN PROD!!) 
 # set -a && . ./.env && set +a && echo $(cut -d= -f1 ./.env) && echo ${MYSQL_USER}
