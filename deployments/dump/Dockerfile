@@ -1,5 +1,5 @@
 # First step - just building the go app
-FROM golang:1.11.5 as builder
+FROM golang:1.11.5 as dbuilder
 ENV WORKDIR /go/src/app
 WORKDIR ${WORKDIR}
 COPY . .
@@ -8,4 +8,4 @@ RUN go get -u github.com/golang/dep/cmd/dep \
     && cd ${WORKDIR}/cmd/dump \
     && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dump .
 
-ENTRYPOINT [ "./cmd/dump/dump" ]
+# ENTRYPOINT [ "./cmd/dump/dump" ]

@@ -2,6 +2,7 @@ stop:
 	docker-compose stop
 
 build:
+	make destroy
 	docker-compose build
 
 start:

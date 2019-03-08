@@ -22,7 +22,7 @@ services:
             dockerfile: ./deployments/import/Dockerfile
         # command: filename
         # volumes:
-        #     - ../:/go/src/app
+            - ../static:/root/static
         env_file:
             - .env
     elasticsearch:
