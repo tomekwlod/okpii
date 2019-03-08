@@ -36,6 +36,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/tomekwlod/okpii/internal"
 	modelsES "github.com/tomekwlod/okpii/models/es"
 	modelsMongodb "github.com/tomekwlod/okpii/models/mongodb"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
@@ -43,7 +44,6 @@ import (
 	_ "golang.org/x/net/html/charset"
 )
 
-const cdid = "1,2,3,9,10,11,12,13,14,15,16,17,22,24,25,26,27,28,29,30,31,32"
 const testOneID = ""
 const collectFromEveryStep = true
 
@@ -55,6 +55,13 @@ type service struct {
 }
 
 func main() {
+
+	deployments, err := internal.Deployments()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("\nStarting with: %v deployment(s)\n\n", deployments)
+
 	t1 := time.Now()
 	var wg sync.WaitGroup
 
@@ -99,7 +106,7 @@ func main() {
 			}
 		}
 
-		for _, did := range strings.Split(cdid, ",") {
+		for _, did := range deployments {
 			did, _ := strconv.Atoi(did)
 
 			result := s.findMatches(did, m["SRC_CUST_ID"], m["CUST_NAME"], m["CITY"], fn, mn, ln)

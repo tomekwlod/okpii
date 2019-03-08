@@ -6,6 +6,16 @@
 version: '3'
 
 services:
+    go-import:
+        container_name: okpii_import
+        build:
+            context: ../
+            dockerfile: ./deployments/import/Dockerfile
+        # command: filename
+        volumes:
+            - ../data/static:/root/static
+        env_file:
+            - .env
     go-dump:
         container_name: okpii_dump
         build:
@@ -15,12 +25,11 @@ services:
             - ../data/static:/root/static
         env_file:
             - .env
-    go-import:
-        container_name: okpii_import
+    go-matching:
+        container_name: okpii_matching
         build:
             context: ../
-            dockerfile: ./deployments/import/Dockerfile
-        # command: filename
+            dockerfile: ./deployments/matching/Dockerfile
         volumes:
             - ../data/static:/root/static
         env_file:

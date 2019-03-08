@@ -8,8 +8,8 @@ Dumps data from MySQL to Elasticsearch
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
+	"github.com/tomekwlod/okpii/internal"
 	modelsES "github.com/tomekwlod/okpii/models/es"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
 
@@ -17,7 +17,6 @@ import (
 	_ "golang.org/x/net/html/charset"
 )
 
-const cdid = "1,2,3,9,10,11,12,13,14,15,16,17,22,24,25,26,27,28,29,30,31,32"
 const batchInsert = 2000
 
 type service struct {
@@ -48,6 +47,13 @@ type Experts struct {
 }
 
 func main() {
+
+	deployments, err := internal.Deployments()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("\nStarting with: %v deployment(s)\n\n", deployments)
+
 	esClient, err := modelsES.ESClient()
 	checkErr(err)
 
@@ -63,7 +69,7 @@ func main() {
 
 	fmt.Println("Querying for experts")
 
-	for _, did := range strings.Split(cdid, ",") {
+	for _, did := range deployments {
 		did, _ := strconv.Atoi(did)
 		fmt.Printf("Deployment: %d\n\n", did)
 
