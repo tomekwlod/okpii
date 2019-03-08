@@ -44,7 +44,6 @@ import (
 	_ "golang.org/x/net/html/charset"
 )
 
-const testOneID = ""
 const collectFromEveryStep = true
 
 type service struct {
@@ -56,11 +55,18 @@ type service struct {
 
 func main() {
 
+	// grab deployments from an argument[1] - comma separated string
 	deployments, err := tools.Deployments()
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("\nStarting with: %v deployment(s)\n\n", deployments)
+
+	// grab a key from an argument[2] if passed - optional only to test one particular key
+	testOneID := tools.OKTest()
+	if testOneID != "" {
+		fmt.Printf("\nChecking only one key: %s\n\n", testOneID)
+	}
 
 	t1 := time.Now()
 	var wg sync.WaitGroup
