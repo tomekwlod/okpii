@@ -21,7 +21,7 @@ services:
             context: ../
             dockerfile: ./deployments/import/Dockerfile
         # command: filename
-        # volumes:
+        volumes:
             - ../static:/root/static
         env_file:
             - .env
