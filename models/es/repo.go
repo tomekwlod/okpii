@@ -197,6 +197,13 @@ func (db *DB) ShortSearch(id, custName, fn, mn, ln, city string, did int, exclID
 	mn1q.Should(elastic.NewMatchPhraseQuery("mn", mn))
 	if mnl > 1 {
 		mn1q.Should(elastic.NewMatchPhraseQuery("mn", strutils.FirstChar(mn)))
+	} else if mnl == 1 {
+		// this is fine, may be a bit risky here:
+		// First M Last  <-- input
+		// First Middle Last
+		// First Maybe  Last
+		// both would match, so either we check against the Mongodb or for now ignore it (maybe also location check?)
+		mn1q.Should(elastic.NewMatchPhrasePrefixQuery("mn", mn))
 	}
 	mn1q.MinimumShouldMatch("1")
 

@@ -25,9 +25,10 @@ godump:
 gomatching:
 	# USAGE: make gomatching 1,2,3,9 [WEM0123456789]
 	docker-compose run --rm go-matching ./matching $(filter-out $@,$(MAKECMDGOALS))
+
 %:
-	# % does nothing to silently ignore the other goals
 	@:
+## %: <-- does nothing to silently ignore the other goals
 
 # Run below to populate the ENVs in dev (DO NOT RUN IT IN PROD!!) 
 # set -a && . ./.env && set +a && echo $(cut -d= -f1 ./.env) && echo ${MYSQL_USER}

@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
 	"github.com/tomekwlod/utils"
 	elastic "gopkg.in/olivere/elastic.v6"
 )
+
+const mappingfn = "mapping.json"
 
 type Repository interface {
 	// searches
@@ -115,8 +118,16 @@ func createIndex(client *elastic.Client, index string) (err error) {
 
 	fmt.Println("No mapping found. Creating one")
 
+	if os.Getenv("STATICPATH") == "" {
+		// in prod mode (with the docker) the STATICPATH won't be empty
+
+		// in dev mode set the default static path
+		os.Setenv("STATICPATH", "../../data/static")
+	}
+	filename := path.Join(os.Getenv("STATICPATH"), mappingfn)
+
 	// Create a new index
-	file, err := utils.ReadWholeFile("./static/mapping.json")
+	file, err := utils.ReadWholeFile(filename)
 	if err != nil {
 		return
 	}

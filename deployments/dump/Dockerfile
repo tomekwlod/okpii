@@ -12,6 +12,9 @@ RUN go get -u github.com/golang/dep/cmd/dep \
 
 # # Second step - copying the files and running the exec
 FROM alpine:3.8
+
+ENV STATICPATH=static
+
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 

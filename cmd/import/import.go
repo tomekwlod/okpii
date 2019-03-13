@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -45,7 +46,7 @@ type service struct {
 }
 
 const batch = 3000
-const filename = "./static/file.csv"
+const onekyfn = "file.csv"
 
 // move me!!
 const (
@@ -67,14 +68,21 @@ func Clean(b []byte) []byte {
 }
 
 func main() {
-	file := filename
+
+	if os.Getenv("STATICPATH") == "" {
+		// in prod mode (with the docker) the STATICPATH won't be empty
+
+		// in dev mode set the default static path
+		os.Setenv("STATICPATH", "../../data/static")
+	}
+	filename := path.Join(os.Getenv("STATICPATH"), onekyfn)
 
 	// export below as a RequireFile(filename string) function
 	for {
-		fileok := utils.DoesFileExist(file)
+		fileok := utils.DoesFileExist(filename)
 
 		if !fileok {
-			yes := utils.AskForConfirmation("\nFile " + file + " couldn't be determined.\nEither you:\n(n) break and upload file yourself or\n(y) continue and pass the file path ")
+			yes := utils.AskForConfirmation("\nFile " + filename + " couldn't be determined.\nEither you:\n(n) break and upload file yourself or\n(y) continue and pass the file path ")
 
 			if !yes {
 				// manual upload; return and exit!
@@ -85,13 +93,13 @@ func main() {
 			fmt.Print("Type a new file path: ")
 			fmt.Scanln(&fi)
 
-			file = fi
+			filename = fi
 		} else {
 			break
 		}
 	}
 
-	fmt.Printf("\nFile %s looks ok! Processing...\n\n", file)
+	fmt.Printf("\nFile %s looks ok! Processing...\n\n", filename)
 
 	t1 := time.Now()
 
