@@ -125,9 +125,9 @@ func main() {
 						kid := int(kid64)
 
 						if kid > 0 {
-							fmt.Printf("{q%d}: [%s] %s %s %s {%s}\t\t ====> \t [%d] %s, {%s} npi: %v, ttid: %v\n",
+							fmt.Printf("{q%d}: [%s] %s %s %s {%s}\t\t ====> \t [%d] (did:%d) %s, {%s} npi: %v, ttid: %v\n",
 								queryNumber, m["SRC_CUST_ID"], fn, mn, ln, m["CITY"],
-								kid, match["name"], match["city"], match["npi"], match["ttid"],
+								kid, did, match["name"], match["city"], match["npi"], match["ttid"],
 							)
 
 							wg.Add(1)
@@ -160,10 +160,12 @@ func (s *service) findMatches(did int, id, custName, city, fn, mn, ln string) (r
 
 	var ids []string
 	var midres []map[string]interface{}
+	var noq = 5 // number of queries
 
-	for _, queryNumber := range []int{1, 2, 3, 4, 5} {
+	for i := 1; i <= noq; i++ {
+		// for _, queryNumber := range []int{1, 2, 3, 4, 5} {
 
-		midres = s.search(queryNumber, id, custName, fn, mn, ln, city, did, ids) //deployment=XX
+		midres = s.search(i, id, custName, fn, mn, ln, city, did, ids) //deployment=XX
 
 		// before, it was a return when we had a match inside this for-loop
 		// I introduced another for-loop underneath to append all the results from every search step
@@ -178,7 +180,7 @@ func (s *service) findMatches(did int, id, custName, city, fn, mn, ln string) (r
 			}
 
 			for _, row := range midres {
-				result[queryNumber] = append(result[queryNumber], row)
+				result[i] = append(result[i], row)
 			}
 
 			// a match -> return with the matches from one search only
@@ -190,7 +192,7 @@ func (s *service) findMatches(did int, id, custName, city, fn, mn, ln string) (r
 		for _, row := range midres {
 			ids = append(ids, strconv.FormatFloat(row["id"].(float64), 'f', 0, 64))
 
-			result[queryNumber] = append(result[queryNumber], row)
+			result[i] = append(result[i], row)
 		}
 	}
 
@@ -251,6 +253,27 @@ func (s *service) search(option int, id, custName, fn, mn, ln, city string, did 
 		return result
 	case 4:
 		r := s.es.OneMiddleNameSearch(id, custName, fn, mn, ln, city, did, exclIDs)
+
+		unique := map[string]string{}
+		for _, row := range r {
+			// the unique doesn't need to be based on the full names
+			// ES matching is already doing the FN matching so here all we have to do is
+			// to check the middle name and fn1 to be sure it is unique for our needs
+			key := fmt.Sprintf("%s%s", strutils.FirstChar(row["fn"].(string)), row["mn"])
+			unique[key] = key
+		}
+		if len(unique) > 1 {
+			// if we have non unique matches in this already risky matching
+			// we should not continue
+
+			// @todo:
+			// Frank G
+			// Frank G       // these to will be ok but not these ones:
+
+			// Frank G
+			// Frank George  // this should also be ok I believe
+			return nil
+		}
 
 		// for security reason - double checking if the match is the only one in the DB
 		for _, row := range r {

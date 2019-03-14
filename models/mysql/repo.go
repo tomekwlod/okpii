@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"strings"
 	"sync"
+
+	strutils "github.com/tomekwlod/utils/strings"
 )
 
 type Experts struct {
@@ -95,6 +97,51 @@ func transform(rows *sql.Rows) (e *Experts, err error) {
 	}
 
 	aliases := mergeAliases(fn1, fn2, fn3, fn4)
+
+	// this is a case when the middle name is either empty or contains a single letter
+	// also first name has to contain a space or a dash
+	//
+	// basically it's trying to modify the middle name if better found in first name
+	for _, separator := range []string{" ", "-"} {
+		fne := strings.Split(fn.String, separator)
+		if len(fne) > 1 {
+			if mn.String == "" {
+				fn.String = fne[0]
+				mn.String = strings.Join(fne[1:], separator)
+
+				break
+			} else {
+				if len(mn.String) == 1 && strutils.FirstChar(strings.Join(fne[1:], " ")) == mn.String {
+					fn.String = fne[0]
+					mn.String = strings.Join(fne[1:], separator)
+
+					break
+				}
+			}
+		}
+	}
+	// end of the middle name modification
+
+	// only if fn doesn't include: `-` , `.` , ` `  . Above statement shoudl take care of them ^^^^
+	if !strings.Contains(fn.String, " ") && !strings.Contains(fn.String, ".") && !strings.Contains(fn.String, "-") {
+		for _, separator := range []string{" ", "-", "."} {
+			mne := strings.Split(mn.String, separator)
+
+			if len(mne) > 1 {
+				if strutils.FirstChar(fn.String) == mne[0] {
+					// Adam A.M. Smith ---> Adam M. Smith
+					// Adam A Smith   !---> Adam Smith    <-- probably too risky
+					mn.String = strings.Join(mne[1:], separator)
+				}
+			}
+		}
+	}
+	// end of the middle name modification
+
+	// remove the dots from the middle name
+	if mn.String != "" {
+		mn.String = strings.Replace(mn.String, ".", " ", -1)
+	}
 
 	mnstr := " "
 	if mn.String != "" {

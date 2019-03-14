@@ -100,67 +100,6 @@ func (db *DB) SimpleSearch(id, custName, fn, mn, ln, city string, did int, exclI
 	return result
 }
 
-// func (s *service) aliases(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
-// 	q := elastic.NewBoolQuery().Filter(
-// 		elastic.NewMatchPhraseQuery("did", did),
-// 		mnSubQuery(mn),
-// 	).Should(
-// 		elastic.NewMatchPhraseQuery("ln", ln),
-// 		elastic.NewMatchPhraseQuery("ln.german", ln),
-// 	).MinimumShouldMatch("1")
-
-// 	if len(exclIDs) > 0 {
-// 		for _, ID := range exclIDs {
-// 			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
-// 		}
-// 	}
-
-// 	q.Must(elastic.NewMatchPhraseQuery("aliases", fn))
-
-// 	nss := elastic.NewSearchSource().Query(q)
-
-// 	searchResult, err := s.es.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	if searchResult.Hits.TotalHits == 0 {
-// 		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
-// 		return nil
-// 	}
-
-// 	if searchResult.Hits.TotalHits > 2 {
-// 		// fmt.Printf("  !!!!!! (aliases) Too many (%d) results %s;\n", searchResult.Hits.TotalHits, id)
-// 		// fmt.Printf("[%s] %s %s %s\n", id, fn, mn, ln)
-
-// 		for _, hit := range searchResult.Hits.Hits {
-// 			var row map[string]interface{}
-
-// 			err := json.Unmarshal(*hit.Source, &row)
-// 			if err != nil {
-// 				panic(err)
-// 			}
-// 			// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
-// 		}
-// 		return nil
-// 	}
-
-// 	for _, hit := range searchResult.Hits.Hits {
-// 		var row map[string]interface{}
-
-// 		err := json.Unmarshal(*hit.Source, &row)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-
-// 		result = append(result, row)
-
-// 		// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
-// 	}
-
-// 	return
-// }
-
 func (db *DB) ShortSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().
 		Filter(
@@ -366,10 +305,10 @@ func (db *DB) OneMiddleNameSearch(id, custName, fn, mn, ln, city string, did int
 		return nil
 	}
 
-	if searchResult.Hits.TotalHits > 1 {
-		// fmt.Printf("[%s] \t\t ====> Too many results! (oneMiddleNameOnly1) %s %s\n", id, fn, ln)
-		return nil
-	}
+	// if searchResult.Hits.TotalHits > 1 {
+	// 	// fmt.Printf("[%s] \t\t ====> Too many results! (oneMiddleNameOnly1) %s %s\n", id, fn, ln)
+	// 	// return nil
+	// }
 
 	for _, hit := range searchResult.Hits.Hits {
 		var row map[string]interface{}
@@ -402,7 +341,7 @@ func (db *DB) OneMiddleNameSearch2(id, custName, fn, mn, ln, city string, did in
 	q.Must(fnq)
 
 	if mn == "" {
-		// this case is only for the names with NO MN included
+		// this case is only for the names WITH MN included
 
 		// ---------------------------
 		// ->Ralf F. Dittrich {OSNABRÜCK}             ====> Found [did:1]: 5711743
@@ -452,9 +391,11 @@ func (db *DB) OneMiddleNameSearch2(id, custName, fn, mn, ln, city string, did in
 func (db *DB) TestSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	q := elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
-		elastic.NewMatchPhraseQuery("ln", ln),
 		elastic.NewPrefixQuery("fn", strutils.FirstChar(fn)),
-	)
+	).Should(
+		elastic.NewMatchPhraseQuery("ln", ln),
+		elastic.NewMatchPhraseQuery("ln.german", ln),
+	).MinimumShouldMatch("1")
 
 	nss := elastic.NewSearchSource().Query(q)
 
