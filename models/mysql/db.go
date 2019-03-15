@@ -9,7 +9,7 @@ import (
 
 type Repository interface {
 	AddOnekeyToKOL(wg *sync.WaitGroup, id, did int, oneky string) (int64, error)
-	FetchExperts(id, did, batchLimit int) (int, []*Experts, error)
+	FetchExperts(id, did, batchLimit int, countries []string) (int, []*Experts, error)
 }
 
 type DB struct {

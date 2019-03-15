@@ -42,9 +42,18 @@ func (db *DB) AddOnekeyToKOL(wg *sync.WaitGroup, id, did int, oneky string) (sta
 	return
 }
 
-func (db *DB) FetchExperts(id, did, batchLimit int) (newID int, result []*Experts, err error) {
+func (db *DB) FetchExperts(id, did, batchLimit int, countries []string) (newID int, result []*Experts, err error) {
 	newID = id
 	// later, if bigger queries: https://dev.to/backendandbbq/the-sql-i-love-chapter-one
+
+	var tmp = []string{}
+	for _, country := range countries {
+		tmp = append(tmp, " l.country_name LIKE \""+country+"\" ")
+	}
+	countriesQuery := ""
+	if len(tmp) > 0 {
+		countriesQuery = "AND (" + (strings.Join(tmp, " OR ")) + ") "
+	}
 
 	rows, err := db.Query(`
 SELECT 
@@ -61,10 +70,10 @@ left join container__embase_entry cem on cem.id = kem.embase_entry_id and length
 LEFT JOIN location l ON l.id = k.default_location_id
 WHERE
 	k.deployment_id = ?
-	and l.country_name like "germany"
+	`+countriesQuery+`
 	AND k.id > ?
 group by k.id
-ORDER BY r.position ASC
+ORDER BY k.id ASC
 LIMIT ?`, did, newID, batchLimit)
 
 	if err != nil {

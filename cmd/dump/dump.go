@@ -6,6 +6,7 @@ Dumps data from MySQL to Elasticsearch
 */
 
 import (
+	"flag"
 	"fmt"
 	"strconv"
 
@@ -17,7 +18,7 @@ import (
 	_ "golang.org/x/net/html/charset"
 )
 
-const batchInsert = 2000
+const batchInsert = 3000
 
 type service struct {
 	es    modelsES.Repository
@@ -47,12 +48,29 @@ type Experts struct {
 }
 
 func main() {
+	didFlag := flag.String(
+		"did",
+		"1,2,3,9,10,11,12,13,14,15,16,17,22,24,25,26,27,28,29,30,31,32",
+		"A deployments list comma separated od a single deployment")
+	countriesFlag := flag.String(
+		"countries",
+		"",
+		"Comma separated list of countries, default: all the countries")
 
-	deployments, err := tools.Deployments()
+	// once done with the flags/arguments let's parse them
+	flag.Parse()
+
+	deployments, err := tools.Deployments(*didFlag)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("\nStarting with: %v deployment(s)\n\n", deployments)
+	fmt.Printf("\n> Starting with: %v deployment(s)\n", deployments)
+
+	countries, err := tools.Countries(*countriesFlag)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("\n> Countries: %v\n", countries)
 
 	esClient, err := modelsES.ESClient()
 	checkErr(err)
@@ -73,22 +91,26 @@ func main() {
 		did, _ := strconv.Atoi(did)
 		fmt.Printf("Deployment: %d\n\n", did)
 
-		lastID := 0
 		var experts []*modelsMysql.Experts // needs to stay here. If we do below: `err,lastID,experts := s.fetchExperts(...)` it will override id all the time instead of reusing the declared one above
 
-		// for {
-		// getting the experts from the MySQL
-		lastID, experts, err = s.mysql.FetchExperts(lastID, did, batchInsert)
-		checkErr(err)
+		lastID := 0
+		for {
+			// getting the experts from the MySQL
+			lastID, experts, err = s.mysql.FetchExperts(lastID, did, batchInsert, countries)
+			checkErr(err)
 
-		if len(experts) == 0 {
-			break
+			quantity := len(experts)
+
+			// stop if no results
+			if quantity == 0 {
+				break
+			}
+
+			// indexing the experts onto ES
+			err = s.es.IndexExperts(experts, batchInsert)
+			checkErr(err)
+
 		}
-
-		// indexing the experts onto ES
-		err = s.es.IndexExperts(experts, batchInsert)
-		checkErr(err)
-		// }
 	}
 }
 

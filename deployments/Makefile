@@ -23,7 +23,7 @@ goimport:
 godump:
 	docker-compose run --rm go-dump
 gomatching:
-	# USAGE: make gomatching 1,2,3,9 [WEM0123456789]
+	# USAGE: make gomatching -did=1,2,3 [-onekey=WEM0123456789]
 	docker-compose run --rm go-matching ./matching $(filter-out $@,$(MAKECMDGOALS))
 
 %:

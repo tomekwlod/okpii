@@ -29,6 +29,7 @@ possible in additional mysql table and later decide either to unmerge experts or
 */
 
 import (
+	"flag"
 	"fmt"
 	"strconv"
 	"strings"
@@ -54,18 +55,29 @@ type service struct {
 }
 
 func main() {
+	didFlag := flag.String(
+		"did",
+		"1,2,3,9,10,11,12,13,14,15,16,17,22,24,25,26,27,28,29,30,31,32",
+		"A deployments list comma separated od a single deployment")
+
+	singleOKFlag := flag.String(
+		"onekey",
+		"",
+		"Pass single OneKey to investigate it")
+
+	// once done with the flags/arguments let's parse them
+	flag.Parse()
 
 	// grab deployments from an argument[1] - comma separated string
-	deployments, err := tools.Deployments()
+	deployments, err := tools.Deployments(*didFlag)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("\nStarting with: %v deployment(s)\n\n", deployments)
+	fmt.Printf("\n> Starting with: %v deployment(s)\n", deployments)
 
-	// grab a key from an argument[2] if passed - optional only to test one particular key
-	testOneID := tools.OKTest()
-	if testOneID != "" {
-		fmt.Printf("\nChecking only one key: %s\n\n", testOneID)
+	singleOK := *singleOKFlag
+	if singleOK != "" {
+		fmt.Printf("\n> Checking only one key: %s\n\n", singleOK)
 	}
 
 	t1 := time.Now()
@@ -103,9 +115,9 @@ func main() {
 
 		fn, mn, ln := names(m)
 
-		if testOneID != "" {
+		if singleOK != "" {
 			// to test only one person
-			if m["SRC_CUST_ID"] != testOneID {
+			if m["SRC_CUST_ID"] != singleOK {
 				continue
 			} else {
 				fmt.Printf("%s :: %s :: %s", fn, mn, ln)
