@@ -19,12 +19,14 @@ rebuild:
 
 
 goimport:
-	docker-compose run --rm go-import
+	# USAGE: make goimport
+	docker-compose run --rm go-import    ./import   $(filter-out $@,$(MAKECMDGOALS))
 godump:
-	docker-compose run --rm go-dump
+	# USAGE: make godump -did=1,2,3 -countries=germany,poland
+	docker-compose run --rm go-dump      ./dump     $(filter-out $@,$(MAKECMDGOALS))
 gomatching:
-	# USAGE: make gomatching -did=1,2,3 [-onekey=WEM0123456789]
-	docker-compose run --rm go-matching ./matching $(filter-out $@,$(MAKECMDGOALS))
+	# USAGE: make gomatching -did=1,2,3 -onekey=WEM0123456789
+	docker-compose run --rm go-matching  ./matching $(filter-out $@,$(MAKECMDGOALS))
 
 %:
 	@:
