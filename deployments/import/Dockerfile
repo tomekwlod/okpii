@@ -5,7 +5,7 @@ ENV WORKDIR /go/src/app
 WORKDIR ${WORKDIR}
 COPY . .
 
-RUN git config --global url."git@github.com:".insteadOf "https://github.com/" \
+RUN git config --global url."git@github.com:tomekwlod/okpii.git".insteadOf "https://github.com/tomekwlod/okpii" \
     && go get -u github.com/golang/dep/cmd/dep \
     && dep init -v && dep ensure \
     && cd ${WORKDIR}/cmd/import \
