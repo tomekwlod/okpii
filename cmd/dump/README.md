@@ -1,14 +1,32 @@
--- Importing experts from MySQL to Elasticsearch
+## Importing experts from MySQL to Elasticsearch
 
-Parameters:
--did        Comma sepadated list of the deployments; Skip to include all of them
--countries  Comma separated list of the countries; Skip to inclide all of them
+This command can be safely run many times because of the index deletion on every run
 
-Usage:
-go run dump.go -did=1,2 -countries=poland,germany
+#### Usage example
+`go run dump.go -did=1,2 -countries=poland,germany`
 
+##### Parameters
+* `-did` [Optional] Comma sepadated list of the deployments (skip to include all of them)
+* `-countries` [Optional] Comma separated list of the countries (skip to include all of them)
 
-This command can be run many times with the same parameters because all the duplicated in ES will be re-indexed
+### TODO
+* change the docker execution method
 
-If you want to remove the index anyway run the below:
-curl -X DELETE "localhost:9202/experts"
+<br /><br />
+
+#### Other
+
+##### Manually delete the local index
+`curl -X DELETE "localhost:9202/experts"`
+
+##### Searching example:
+```
+curl -XGET "http://localhost:9202/experts/_search" -H 'Content-Type: application/json' -d'
+{
+  "query": {
+    "match": {
+      "country" : "GERMANY"
+    }
+  }
+}' | json_pp
+```

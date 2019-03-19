@@ -19,13 +19,15 @@ const mappingfn = "mapping.json"
 
 type Repository interface {
 	// searches
-	SimpleSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
-	ShortSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
-	NoMiddleNameSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
-	OneMiddleNameSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
-	OneMiddleNameSearch2(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
-	TestSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{}
+	SimpleSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	ShortSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	NoMiddleNameSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	OneMiddleNameSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	OneMiddleNameSearch2(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	TestSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 
+	// index
+	RemoveIndex() error
 	// index
 	IndexExperts(experts []*modelsMysql.Experts, batchInsert int) error
 }

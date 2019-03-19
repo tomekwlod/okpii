@@ -85,11 +85,17 @@ func main() {
 		mysql: mysqlClient,
 	}
 
+	fmt.Println("Removing old index")
+	err = s.es.RemoveIndex()
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Println("Querying for experts")
 
 	for _, did := range deployments {
 		did, _ := strconv.Atoi(did)
-		fmt.Printf("Deployment: %d\n\n", did)
+		fmt.Printf("\nDeployment: %d\n\n", did)
 
 		var experts []*modelsMysql.Experts // needs to stay here. If we do below: `err,lastID,experts := s.fetchExperts(...)` it will override id all the time instead of reusing the declared one above
 

@@ -28,7 +28,9 @@ func Deployments(str string) (deployments []string, err error) {
 func Countries(str string) (countries []string, err error) {
 	// Germany, Poland, switzerland
 
-	countries = strings.Split(str, ",")
+	if str != "" {
+		countries = strings.Split(str, ",")
+	}
 
 	return
 }

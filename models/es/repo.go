@@ -12,18 +12,29 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
-func (db *DB) SimpleSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) []map[string]interface{} {
-	result := []map[string]interface{}{}
-
-	q := elastic.NewBoolQuery().Filter(
+func baseQuery(did int, country string, exclIDs []string) (q *elastic.BoolQuery) {
+	q = elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 	)
+
+	if country != "" {
+		// if country provided, use it, otherwise ignore the country at all
+		q.Filter(elastic.NewMatchPhraseQuery("country", country))
+	}
 
 	if len(exclIDs) > 0 {
 		for _, ID := range exclIDs {
 			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
 		}
 	}
+
+	return
+}
+
+func (db *DB) SimpleSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{} {
+	result := []map[string]interface{}{}
+
+	q := baseQuery(did, country, exclIDs)
 
 	mnstr := " "
 	mn1 := ""
@@ -100,25 +111,17 @@ func (db *DB) SimpleSearch(id, custName, fn, mn, ln, city string, did int, exclI
 	return result
 }
 
-func (db *DB) ShortSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
-	q := elastic.NewBoolQuery().
-		Filter(
-			elastic.NewMatchPhraseQuery("did", did),
-		).
-		Should(
-			elastic.NewMatchPhraseQuery("ln", ln),
-			elastic.NewMatchPhraseQuery("ln.german", ln),
-		).MinimumShouldMatch("1")
+func (db *DB) ShortSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	q := baseQuery(did, country, exclIDs)
+
+	q.Should(
+		elastic.NewMatchPhraseQuery("ln", ln),
+		elastic.NewMatchPhraseQuery("ln.german", ln),
+	).MinimumShouldMatch("1")
 
 	if mn == "" {
 		// this case is only for the names with MN included
 		return nil
-	}
-
-	if len(exclIDs) > 0 {
-		for _, ID := range exclIDs {
-			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
-		}
 	}
 
 	fn = strings.Replace(fn, ".", "", -1)
@@ -200,9 +203,10 @@ func (db *DB) ShortSearch(id, custName, fn, mn, ln, city string, did int, exclID
 	return
 }
 
-func (db *DB) NoMiddleNameSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
-	q := elastic.NewBoolQuery().Filter(
-		elastic.NewMatchPhraseQuery("did", did),
+func (db *DB) NoMiddleNameSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	q := baseQuery(did, country, exclIDs)
+
+	q.Filter(
 		elastic.NewTermQuery("mn", ""),
 	).Should(
 		elastic.NewMatchPhraseQuery("ln", ln),
@@ -219,12 +223,6 @@ func (db *DB) NoMiddleNameSearch(id, custName, fn, mn, ln, city string, did int,
 		//
 		// We want to match this only if R* Dittrich exist in OneKey Db only once!
 		return nil
-	}
-
-	if len(exclIDs) > 0 {
-		for _, ID := range exclIDs {
-			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
-		}
 	}
 
 	// fn exactly fn1
@@ -261,10 +259,10 @@ func (db *DB) NoMiddleNameSearch(id, custName, fn, mn, ln, city string, did int,
 	return
 }
 
-func (db *DB) OneMiddleNameSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
-	q := elastic.NewBoolQuery().Filter(
-		elastic.NewMatchPhraseQuery("did", did),
-	).Should(
+func (db *DB) OneMiddleNameSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	q := baseQuery(did, country, exclIDs)
+
+	q.Should(
 		elastic.NewMatchPhraseQuery("ln", ln),
 		elastic.NewMatchPhraseQuery("ln.german", ln),
 	).MinimumShouldMatch("1")
@@ -285,12 +283,6 @@ func (db *DB) OneMiddleNameSearch(id, custName, fn, mn, ln, city string, did int
 		//
 		// We want to match this only if Ralf * Dittrich exist in OneKey Db only once!
 		return nil
-	}
-
-	if len(exclIDs) > 0 {
-		for _, ID := range exclIDs {
-			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
-		}
 	}
 
 	nss := elastic.NewSearchSource().Query(q)
@@ -324,9 +316,10 @@ func (db *DB) OneMiddleNameSearch(id, custName, fn, mn, ln, city string, did int
 	return
 }
 
-func (db *DB) OneMiddleNameSearch2(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
-	q := elastic.NewBoolQuery().Filter(
-		elastic.NewMatchPhraseQuery("did", did),
+func (db *DB) OneMiddleNameSearch2(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	q := baseQuery(did, country, exclIDs)
+
+	q.Filter(
 		elastic.NewTermQuery("mn", ""),
 	).Should(
 		elastic.NewMatchPhraseQuery("ln", ln),
@@ -349,12 +342,6 @@ func (db *DB) OneMiddleNameSearch2(id, custName, fn, mn, ln, city string, did in
 		//
 		// We want to match this only if Ralf * Dittrich exist in OneKey Db only once!
 		return nil
-	}
-
-	if len(exclIDs) > 0 {
-		for _, ID := range exclIDs {
-			q.MustNot(elastic.NewMatchPhraseQuery("id", ID))
-		}
 	}
 
 	nss := elastic.NewSearchSource().Query(q)
@@ -388,9 +375,10 @@ func (db *DB) OneMiddleNameSearch2(id, custName, fn, mn, ln, city string, did in
 	return
 }
 
-func (db *DB) TestSearch(id, custName, fn, mn, ln, city string, did int, exclIDs []string) (result []map[string]interface{}) {
-	q := elastic.NewBoolQuery().Filter(
-		elastic.NewMatchPhraseQuery("did", did),
+func (db *DB) TestSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	q := baseQuery(did, country, exclIDs)
+
+	q.Filter(
 		elastic.NewPrefixQuery("fn", strutils.FirstChar(fn)),
 	).Should(
 		elastic.NewMatchPhraseQuery("ln", ln),
@@ -514,6 +502,25 @@ func (db *DB) TestSearch(id, custName, fn, mn, ln, city string, did int, exclIDs
 
 // 	return
 // }
+
+func (db *DB) RemoveIndex() (err error) {
+	// move below to a separate function
+	deleteIndex, err := db.DeleteIndex("experts").Do(context.TODO())
+
+	if err != nil {
+		return
+	}
+
+	if deleteIndex == nil {
+		return fmt.Errorf("expected response; got: %v", deleteIndex)
+	}
+	if !deleteIndex.Acknowledged {
+		return fmt.Errorf("expected ack for deleting index; got %v", deleteIndex)
+	}
+
+	return
+}
+
 func (db *DB) IndexExperts(experts []*modelsMysql.Experts, batchInsert int) (err error) {
 	if batchInsert == 0 {
 		batchInsert = 1000
