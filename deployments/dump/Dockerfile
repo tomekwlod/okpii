@@ -5,9 +5,7 @@ ENV WORKDIR /go/src/app
 WORKDIR ${WORKDIR}
 COPY . .
 
-RUN mkdir /root/.ssh && echo "StrictHostKeyChecking no " > /root/.ssh/config \
-    && git config --global url."git@github.com:".insteadOf "https://github.com/" \
-    && go get -u github.com/golang/dep/cmd/dep \
+RUN go get -u github.com/golang/dep/cmd/dep \
     && dep init && dep ensure \
     && cd ${WORKDIR}/cmd/dump \
     && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dump .
