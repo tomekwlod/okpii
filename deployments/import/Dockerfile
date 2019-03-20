@@ -5,11 +5,11 @@ ENV WORKDIR /go/src/app
 WORKDIR ${WORKDIR}
 COPY . .
 
-RUN echo "[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig \
-    && mkdir /root/.ssh && echo "StrictHostKeyChecking no " > /root/.ssh/config \
+RUN mkdir /root/.ssh && echo "StrictHostKeyChecking no " > /root/.ssh/config \
     && go get -u github.com/golang/dep/cmd/dep \
     && dep init -v && dep ensure \
     && cd ${WORKDIR}/cmd/import \
+    && echo "[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig \
     && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o import .
 
 # # Second step - copying the files and running the exec
