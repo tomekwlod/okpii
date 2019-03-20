@@ -5,7 +5,8 @@ ENV WORKDIR /go/src/app
 WORKDIR ${WORKDIR}
 COPY . .
 
-RUN mkdir /root/.ssh && echo "StrictHostKeyChecking no " > /root/.ssh/config \
+RUN echo "[url \"git@github.com:\"]\n\tinsteadOf = https://github.com/" >> /root/.gitconfig \
+    && mkdir /root/.ssh && echo "StrictHostKeyChecking no " > /root/.ssh/config \
     && go get -u github.com/golang/dep/cmd/dep \
     && dep init -v && dep ensure \
     && cd ${WORKDIR}/cmd/import \
