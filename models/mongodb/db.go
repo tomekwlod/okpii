@@ -11,6 +11,7 @@ import (
 )
 
 type Repository interface {
+	ClearCollection() (int64, error)
 	Onekeys(out chan<- map[string]string)
 	CountOneKeyOcc(custName, fn, ln string) int64
 	IsInOneKeyDB(fn, mn, ln string) bool

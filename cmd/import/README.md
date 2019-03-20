@@ -1,9 +1,10 @@
 ## Importing OneKey data from CSV to MongoDB
 
-The script imports the data from the CSV file provided by the OneKy to a MongoDB instance. Before you run the import please double check the column standards below and change them if required!
+The script imports the data from the CSV file provided by the OneKy to a MongoDB instance. Before you run the import please double check the column standards below and change them if required! <br />
+The script can be run many times because on every run the data in MongoDB will be truncated
 
 #### Dependency
-The script requires a CSV file named **file.csv** located in _`data/static/file.csv`_
+This script requires a CSV file named **file.csv** located in _`data/static/file.csv`_. If you want to run the script against a new extraction simply replace the **file.csv** and re-run this script. Of course the other two scripts would have to be re-run as well.
 
 #### Usage example
 `go run import.go `

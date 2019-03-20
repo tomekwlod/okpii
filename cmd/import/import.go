@@ -114,6 +114,13 @@ func main() {
 		mongo: db,
 	}
 
+	fmt.Println("Removing the old data")
+	rowsDeleted, err := s.mongo.ClearCollection()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("\n%d rows deleted from MongoDB\n\n", rowsDeleted)
+
 	ch := make(chan []string) // one line from csv
 	go csvReader(filename, ch)
 

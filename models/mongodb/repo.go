@@ -11,6 +11,22 @@ import (
 	"github.com/mongodb/mongo-go-driver/mongo/options"
 )
 
+func (db *DB) ClearCollection() (rowsAffected int64, err error) {
+	// defining the collection
+	collection := db.Collection("test2")
+
+	filter := bson.M{}
+
+	delres, err := collection.DeleteMany(context.TODO(), filter)
+	if err != nil {
+		// no match, it is truly unique
+		return 0, err
+	}
+
+	// entry found, skip!
+	return delres.DeletedCount, nil
+}
+
 func (db *DB) IsInOneKeyDB(fn, mn, ln string) bool {
 	// defining the collection
 	collection := db.Collection("test2")
@@ -40,6 +56,7 @@ func (db *DB) IsInOneKeyDB(fn, mn, ln string) bool {
 	// entry found, skip!
 	return false
 }
+
 func (db *DB) CountOneKeyOcc(custName, fn, ln string) int64 {
 	// defining the collection
 	collection := db.Collection("test2")
