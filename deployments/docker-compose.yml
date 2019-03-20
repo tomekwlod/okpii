@@ -14,6 +14,7 @@ services:
         # command: filename
         volumes:
             - ../data/static:/root/static
+            - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
     go-dump:
@@ -23,6 +24,7 @@ services:
             dockerfile: ./deployments/dump/Dockerfile
         volumes:
             - ../data/static:/root/static
+            - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
     go-matching:
@@ -32,6 +34,7 @@ services:
             dockerfile: ./deployments/matching/Dockerfile
         volumes:
             - ../data/static:/root/static
+            - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
     elasticsearch:

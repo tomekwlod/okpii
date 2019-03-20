@@ -5,7 +5,7 @@ ENV WORKDIR /go/src/app
 WORKDIR ${WORKDIR}
 COPY . .
 
-RUN git config --global url."git@github.com:tomekwlod/okpii.git".insteadOf "https://github.com/tomekwlod/okpii" \
+RUN mkdir /root/.ssh && echo "StrictHostKeyChecking no " > /root/.ssh/config \
     && go get -u github.com/golang/dep/cmd/dep \
     && dep init && dep ensure \
     && cd ${WORKDIR}/cmd/dump \
