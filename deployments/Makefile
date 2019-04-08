@@ -30,7 +30,8 @@ gomatching:
 
 %:
 	@:
-## %: <-- does nothing to silently ignore the other goals
+## %: - rule which match any task name;  
+## @: - empty recipe = do nothing
 
 # Run below to populate the ENVs in dev (DO NOT RUN IT IN PROD!!) 
 # set -a && . ./.env && set +a && echo $(cut -d= -f1 ./.env) && echo ${MYSQL_USER}

@@ -503,22 +503,21 @@ func (db *DB) TestSearch(id, custName, fn, mn, ln, country, city string, did int
 // 	return
 // }
 
-func (db *DB) RemoveIndex() (err error) {
+func (db *DB) RemoveData() (deleted int64, err error) {
+	del, err := db.DeleteByQuery("experts").Query(elastic.NewMatchAllQuery()).Do(context.TODO())
+
 	// move below to a separate function
-	deleteIndex, err := db.DeleteIndex("experts").Do(context.TODO())
+	// deleteIndex, err := db.DeleteIndex("experts").Do(context.TODO())
 
 	if err != nil {
 		return
 	}
 
-	if deleteIndex == nil {
-		return fmt.Errorf("expected response; got: %v", deleteIndex)
-	}
-	if !deleteIndex.Acknowledged {
-		return fmt.Errorf("expected ack for deleting index; got %v", deleteIndex)
+	if del == nil {
+		return 0, fmt.Errorf("expected response; got: %+v", del)
 	}
 
-	return
+	return del.Deleted, nil
 }
 
 func (db *DB) IndexExperts(experts []*modelsMysql.Experts, batchInsert int) (err error) {

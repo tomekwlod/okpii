@@ -9,7 +9,7 @@ The script requires a mapping file named **mapping.json** located in _`data/stat
 `go run dump.go -did=1,2 -countries=poland,germany`
 
 ##### Parameters
-* `-did` [Optional] Comma sepadated list of the deployments (skip to include all of them)
+* `-did` [Optional] Comma separated list of the deployments (skip to include all of them)
 * `-countries` [Optional] Comma separated list of the countries (skip to include all of them)
 <br /><br />
 

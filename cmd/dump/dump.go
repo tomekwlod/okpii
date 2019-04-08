@@ -85,11 +85,12 @@ func main() {
 		mysql: mysqlClient,
 	}
 
-	fmt.Println("Removing old index")
-	err = s.es.RemoveIndex()
+	fmt.Println("Removing old data")
+	deleted, err := s.es.RemoveData()
 	if err != nil {
 		panic(err)
 	}
+	fmt.Printf("Removed %d rows\n\n", deleted)
 
 	fmt.Println("Querying for experts")
 
