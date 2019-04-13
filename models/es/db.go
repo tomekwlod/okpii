@@ -18,6 +18,8 @@ import (
 const mappingfn = "mapping.json"
 
 type Repository interface {
+	Count(did int) int
+
 	// searches
 	SimpleSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 	ShortSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}

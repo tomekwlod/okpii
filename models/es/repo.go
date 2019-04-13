@@ -12,14 +12,62 @@ import (
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
+var countryCodes = map[string]string{
+	"AND": "Andorra",
+	"AUS": "Australia",
+	"AUT": "Austria",
+	"BEL": "Belgium",
+	"CHE": "Seychelles",
+	"CZE": "Czech Republic",
+	"DEU": "Germany",
+	"DNK": "Denmark",
+	"ESP": "Spain",
+	"EST": "Estonia",
+	"FIN": "Finland",
+	"FRA": "France",
+	"FRO": "Faroe Islands",
+	"GBR": "United Kingdom",
+	"GLP": "Guadeloupe",
+	"GRL": "Greenland",
+	"GUF": "French Guiana",
+	"HRV": "Croatia",
+	"HUN": "Hungary",
+	"IRL": "Ireland",
+	"ITA": "Italy",
+	"LTU": "Lithuania",
+	"LUX": "Luxembourg",
+	"LVA": "Latvia",
+	"MCO": "Monaco",
+	"MTQ": "Martinique",
+	"MYT": "Mayotte",
+	"NCL": "New Caledonia",
+	"NLD": "Netherlands",
+	"NOR": "Norway",
+	"NZL": "New Zealand",
+	"POL": "Poland",
+	"PRT": "Portugal",
+	"PYF": "French Polynesia",
+	"REU": "Reunion",
+	"SPM": "Saint Pierre and Miquelon",
+	"SVK": "Slovakia",
+	"SVN": "Slovenia",
+	"SWE": "Sweden",
+	"TUR": "Turkey",
+	"WLF": "Wallis and Futuna",
+}
+
 func baseQuery(did int, country string, exclIDs []string) (q *elastic.BoolQuery) {
 	q = elastic.NewBoolQuery().Filter(
 		elastic.NewMatchPhraseQuery("did", did),
 	)
 
 	if country != "" {
-		// if country provided, use it, otherwise ignore the country at all
-		q.Filter(elastic.NewMatchPhraseQuery("country", country))
+		if val, ok := countryCodes[country]; ok {
+			// if country provided, use it, otherwise ignore the country at all
+			q.Filter(elastic.NewMatchPhraseQuery("country", val))
+		} else {
+			panic(fmt.Errorf("Country code %s not defined", country))
+		}
 	}
 
 	if len(exclIDs) > 0 {
@@ -502,6 +550,21 @@ func (db *DB) TestSearch(id, custName, fn, mn, ln, country, city string, did int
 
 // 	return
 // }
+
+func (db *DB) Count(did int) (count int) {
+	q := baseQuery(did, "", nil)
+
+	nss := elastic.NewSearchSource().Query(q)
+
+	searchResult, err := db.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	hits := searchResult.Hits.TotalHits
+
+	return int(hits)
+}
 
 func (db *DB) RemoveData() (deleted int64, err error) {
 	del, err := db.DeleteByQuery("experts").Query(elastic.NewMatchAllQuery()).Do(context.TODO())
