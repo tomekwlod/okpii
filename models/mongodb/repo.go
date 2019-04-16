@@ -107,10 +107,13 @@ func (db *DB) Onekeys(out chan<- map[string]string) {
 		{"CUST_NAME", 1},
 		{"SRC_CUST_ID", 1},
 		{"CITY", 1},
+		{"CNTRY", 1},
 	})
 	// options.SetLimit(10)
 
-	cur, err := collection.Find(context.TODO(), filter, options)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*600*time.Second) // 10min * 6 = 1h
+	defer cancel()
+	cur, err := collection.Find(ctx, filter, options)
 	if err != nil {
 		panic(err)
 	}

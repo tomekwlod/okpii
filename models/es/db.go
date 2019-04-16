@@ -10,6 +10,7 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/tomekwlod/okpii/models"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
 	"github.com/tomekwlod/utils"
 	elastic "gopkg.in/olivere/elastic.v6"
@@ -18,15 +19,20 @@ import (
 const mappingfn = "mapping.json"
 
 type Repository interface {
+	ExecuteQuery(q *elastic.BoolQuery) ([]map[string]interface{}, error)
 	Count(did int) int
+	FindOne(id, did int, ln string) (models.Expert, error)
+	MarkAsDeleted(id string) (err error)
+	UpdatePartially(id string, exp models.Expert) (err error)
 
 	// searches
-	SimpleSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
-	ShortSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
-	NoMiddleNameSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
-	OneMiddleNameSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
-	OneMiddleNameSearch2(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
-	TestSearch(id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	BaseQuery(did int, country string, exclIDs []string) (*elastic.BoolQuery, error)
+	SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	NoMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	OneMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	OneMiddleNameSearch2(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	TestSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 
 	// index
 	RemoveData() (int64, error)

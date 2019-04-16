@@ -4,10 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/context"
 	"github.com/julienschmidt/httprouter"
+	"github.com/tomekwlod/okpii/models"
+	strutils "github.com/tomekwlod/utils/strings"
+	elastic "gopkg.in/olivere/elastic.v6"
 )
 
 var (
@@ -76,10 +80,10 @@ func (s *service) loggingHandler(next http.Handler) http.Handler {
 // I expect to receive this format only
 func acceptHandler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Accept") != "application/json" {
-			WriteError(w, errNotAcceptable)
-			return
-		}
+		// if r.Header.Get("Accept") != "application/json" {
+		// 	WriteError(w, errNotAcceptable)
+		// 	return
+		// }
 
 		next.ServeHTTP(w, r)
 	}
@@ -110,7 +114,6 @@ func bodyHandler(v interface{}) func(http.Handler) http.Handler {
 			val := reflect.New(t).Interface()
 
 			err := json.NewDecoder(r.Body).Decode(val)
-
 			if err != nil {
 				WriteError(w, errBadRequest)
 				return
@@ -140,92 +143,178 @@ func allowCorsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Main handlers
-func (s *service) pagesHandler(w http.ResponseWriter, r *http.Request) {
-	// repo := s.getPageRepo()
-	// defer repo.Close()
+func (s *service) expertsHandler(w http.ResponseWriter, r *http.Request) {
+	params := context.Get(r, "params").(httprouter.Params)
+	did, err := strconv.Atoi(params.ByName("did"))
+	if err != nil {
+		WriteError(w, &Error{"wrong_parameter", 400, "Parameter provided couldn't be used", "One of the parameters is in wrong format."})
+		return
+	}
 
-	// pages, err := repo.Pages()
-	// if err != nil {
-	// 	WriteError(w, errBadRequest)
-	// 	return
-	// }
-
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
-	w.Header().Set("Content-Type", "application/json")
-
-	// should be json.NewEncoder(w).Encode(pages) where pages are PageCollection
-	// below is a workaround to support data:{} responses
-	// type resp struct {
-	// 	Data []*ping.Page `json:"data"`
-	// }
-	// json.NewEncoder(w).Encode(resp{Data: pages})
-}
-
-func (s *service) pageHandler(w http.ResponseWriter, r *http.Request) {
-	// params := context.Get(r, "params").(httprouter.Params)
-
-	// repo := s.getPageRepo()
-	// defer repo.Close()
-
-	// page, err := repo.Find(params.ByName("id"))
-	// if err != nil {
-	// 	s.logger.Panicln(err)
-	// }
+	count := s.es.Count(did)
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
 	w.Header().Set("Content-Type", "application/json")
 
-	// json.NewEncoder(w).Encode(page)
+	type resp struct {
+		Experts      int `json:"experts"`
+		DeploymentID int `json:"deploymentId"`
+	}
+	json.NewEncoder(w).Encode(resp{Experts: count, DeploymentID: did})
 }
 
-func (s *service) createpageHandler(w http.ResponseWriter, r *http.Request) {
-	// body := context.Get(r, "body").(*ping.SinglePage)
-	// body.Data.SetInsertDefaults(time.Now())
+// @todo: THIS NEEDS REFACTORING! IT IS JUST AN INITIAL BRIEF
+func (s *service) matchHandler(w http.ResponseWriter, r *http.Request) {
+	// get body from the context
+	exp := context.Get(r, "body").(*models.Expert)
+	result := map[int]interface{}{}
 
-	// repo := s.getPageRepo()
-	// defer repo.Close()
+	// check the requirements
+	if exp.ID == 0 || exp.Ln == "" || exp.DID == 0 {
+		WriteError(w, &Error{"wrong_parameter", 400, "Some required parameters coudn't be found", "Requirement: {id(int), ln(string), did(int)}"})
+		return
+	}
 
-	// err := repo.Create(&body.Data)
-	// if err != nil {
-	// 	s.logger.Panicln(err)
-	// }
+	// check if the base expert is really the one
+	k, err := s.es.FindOne(exp.ID, exp.DID, exp.Ln)
+	if err != nil {
+		WriteError(w, &Error{"not_found", 400, "Expert (" + strconv.Itoa(exp.ID) + ") couldn't be found", "Synchronize the data"})
+		return
+	}
+
+	exclIDs := []string{strconv.Itoa(k.ID)}
+	// searching
+	m := s.es.SimpleSearch(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
+	for _, row := range m {
+		id := int(row["id"].(float64))
+		row["type"] = "simple"
+		result[id] = row
+		// result = append(result, strconv.FormatFloat(row["id"].(float64), 'f', 0, 64))
+	}
+	m = s.es.ShortSearch(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
+	for _, row := range m {
+		id := int(row["id"].(float64))
+		row["type"] = "short"
+		result[id] = row
+	}
+
+	mn0 := s.es.NoMiddleNameSearch(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
+	if len(mn0) > 0 {
+		// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
+		q, err := s.es.BaseQuery(k.DID, "", exclIDs)
+		if err != nil {
+			s.logger.Println("Error detected", err)
+			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
+			return
+		}
+
+		q.Must(elastic.NewMatchPhraseQuery("ln", k.Ln))
+		q.Must(elastic.NewPrefixQuery("fn", strutils.FirstChar(k.Fn)))
+		rows, err := s.es.ExecuteQuery(q)
+		if err != nil {
+			s.logger.Println("Error detected", err)
+			WriteError(w, &Error{"not_found", 404, "Error detected", err.Error()})
+			return
+		}
+
+		if len(rows) == 1 {
+			for _, row := range rows {
+				id := int(row["id"].(float64))
+				row["type"] = "nomid"
+				result[id] = row
+			}
+		} else {
+			s.logger.Println("There is more people with the same initials Fn% Ln")
+		}
+	}
+
+	mn1 := s.es.OneMiddleNameSearch(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
+	if len(mn1) > 0 {
+		// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
+		q, err := s.es.BaseQuery(k.DID, "", nil)
+		if err != nil {
+			s.logger.Println("Error detected", err)
+			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
+			return
+		}
+
+		q.Must(elastic.NewMatchPhraseQuery("ln", k.Ln))
+		q.Must(elastic.NewMatchPhraseQuery("fn", k.Fn))
+		rows, err := s.es.ExecuteQuery(q)
+		if err != nil {
+			s.logger.Println("Error detected", err)
+			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
+			return
+		}
+
+		if len(rows) == 1 {
+			for _, row := range rows {
+				id := int(row["id"].(float64))
+				row["type"] = "onemid1"
+				result[id] = row
+			}
+		} else {
+			s.logger.Println("There is more people with the same initials Fn *Mn* Ln")
+		}
+	}
+
+	mn2 := s.es.OneMiddleNameSearch2(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
+	if len(mn2) > 0 {
+		// we have to check here how many other fn-ln we have, if more than one we cannot merge here
+		q, err := s.es.BaseQuery(k.DID, "", exclIDs)
+		if err != nil {
+			s.logger.Println("Error detected", err)
+			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
+			return
+		}
+
+		q.Must(elastic.NewMatchPhraseQuery("ln", k.Ln))
+		q.Must(elastic.NewMatchPhraseQuery("fn", k.Fn))
+		rows, err := s.es.ExecuteQuery(q)
+		if err != nil {
+			s.logger.Println("Error detected", err)
+			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
+			return
+		}
+
+		if len(rows) == 1 {
+			for _, row := range rows {
+				id := int(row["id"].(float64))
+				row["type"] = "onemid2"
+				result[id] = row
+			}
+		} else {
+			s.logger.Println("There is more people with the same initials Fn1% Ln")
+		}
+	}
+
+	s.logger.Println(result)
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
 	w.Header().Set("Content-Type", "application/json")
 
-	w.WriteHeader(201)
-	// json.NewEncoder(w).Encode(body)
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(result)
 }
 
-func (s *service) updatepageHandler(w http.ResponseWriter, r *http.Request) {
-	// params := context.Get(r, "params").(httprouter.Params)
-	// body := context.Get(r, "body").(*ping.SinglePage)
+func (s *service) updateHandler(w http.ResponseWriter, r *http.Request) {
+	params := context.Get(r, "params").(httprouter.Params)
+	id := params.ByName("id")
+	body := context.Get(r, "body").(*models.Expert)
 
-	// repo := s.getPageRepo()
-	// defer repo.Close()
+	if id == "" {
+		s.logger.Panicln("ID cannot be empty")
+	}
 
-	// update := ping.SinglePage{}
-	// update.Data.Interval = body.Data.Interval
-	// update.Data.Description = body.Data.Description
-	// update.Data.Name = body.Data.Name
-	// update.Data.Url = body.Data.Url
-	// update.Data.RescueUrl = body.Data.RescueUrl
-	// update.Data.LastStatus = body.Data.LastStatus
-	// update.Data.Disabled = body.Data.Disabled
-
-	// update.Data.Id = bson.ObjectIdHex(params.ByName("id"))
-	// update.Data.SetUpdateDefaults(time.Now())
-
-	// err := repo.Update(&update.Data)
-	// if err != nil {
-	// 	s.logger.Panicln(err)
-	// }
+	err := s.es.UpdatePartially(id, *body)
+	if err != nil {
+		s.logger.Println("Error detected", err)
+		WriteError(w, &Error{"not_found", 404, "Error detected", err.Error()})
+	}
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
@@ -235,16 +324,19 @@ func (s *service) updatepageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("\n"))
 }
 
-func (s *service) deletepageHandler(w http.ResponseWriter, r *http.Request) {
-	// params := context.Get(r, "params").(httprouter.Params)
+func (s *service) deleteHandler(w http.ResponseWriter, r *http.Request) {
+	params := context.Get(r, "params").(httprouter.Params)
+	id := params.ByName("id")
 
-	// repo := s.getPageRepo()
-	// defer repo.Close()
+	if id == "" {
+		s.logger.Panicln("ID cannot be empty")
+	}
 
-	// err := repo.Delete(params.ByName("id"))
-	// if err != nil {
-	// 	s.logger.Panicln(err)
-	// }
+	err := s.es.MarkAsDeleted(id)
+	if err != nil {
+		s.logger.Println("Error detected", err)
+		WriteError(w, &Error{"not_found", 404, "Error detected", err.Error()})
+	}
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")

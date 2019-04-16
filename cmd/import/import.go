@@ -6,13 +6,14 @@ Imports a CSV file into MongoDB database
 */
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/smartystreets/scanners/csv"
 
 	"github.com/tomekwlod/utils"
 
@@ -182,23 +183,19 @@ func csvReader(fname string, out chan<- []string) {
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	scanner := csv.NewScanner(f,
+		csv.Comma(','), csv.Comment('#'), csv.ContinueOnError(true))
+
 	for scanner.Scan() {
-		columns := strings.Split(scanner.Text(), ",")
-
-		out <- columns
+		if err := scanner.Error(); err != nil {
+			fmt.Fprintln(os.Stderr, "reading standard input:", err)
+		} else {
+			out <- scanner.Record()
+		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, "reading standard input:", err)
-	}
-
 }
 
 func validateHeader(headers []string) (newHeaders []string, err error) {
-	// required := []string{"SRC_CUST_ID", "CUST_NAME", "FIRST_NAME", "MIDDLE_NAME", "LAST_NAME", "SRC_FIRST_NAME", "SRC_LAST_NAME", "SRC_MIDDLE_NAME",
-	// 	"OneKeyID_Address", "City", "ZIP", "State", "Country",
-	// }
 	required := []string{"SRC_CUST_ID", "CUST_NAME", "FIRST_NAME", "LAST_NAME", "CITY", "CNTRY"}
 
 	for _, header := range headers {

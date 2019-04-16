@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/context"
 	"github.com/justinas/alice"
+	"github.com/tomekwlod/okpii/models"
 	modelsES "github.com/tomekwlod/okpii/models/es"
 )
 
@@ -40,18 +41,17 @@ func main() {
 	optionsHandlers := alice.New(context.ClearHandler, s.loggingHandler)
 
 	router := NewRouter()
-	router.Get("/pages", commonHandlers.ThenFunc(s.pagesHandler))
-	router.Get("/page/:id", commonHandlers.ThenFunc(s.pageHandler))
-	// update
-	// router.Put("/page/:id", commonHandlers.Append(contentTypeHandler, bodyHandler(ping.SinglePage{})).ThenFunc(s.updatepageHandler))
+	router.Get("/experts/:did", commonHandlers.ThenFunc(s.expertsHandler))
 	// create
-	// router.Post("/page", commonHandlers.Append(contentTypeHandler, bodyHandler(ping.SinglePage{})).ThenFunc(s.createpageHandler))
+	router.Post("/match", commonHandlers.Append(contentTypeHandler, bodyHandler(models.Expert{})).ThenFunc(s.matchHandler))
 	// delete
-	router.Delete("/page/:id", commonHandlers.ThenFunc(s.deletepageHandler))
-	// -- router.Get("/page/:id/history", commonHandlers.ThenFunc(appC.pageHistoryHandler))
+	router.Delete("/expert/:id", commonHandlers.ThenFunc(s.deleteHandler))
+	// update
+	router.Put("/expert/:id", commonHandlers.Append(contentTypeHandler, bodyHandler(models.Expert{})).ThenFunc(s.updateHandler))
+
+	// cors support
 	router.Options("/*name", optionsHandlers.ThenFunc(allowCorsHandler))
 
-	// curl -X POST -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{"data": {"url":"http://website.com/api", "status":0, "interval":1}}' localhost:8080/page
 	l.Printf("Server started and listening on port %s. Ready for the requests.\n\n", "7171")
 	if err := http.ListenAndServe(":7171", router); err != nil {
 		l.Panic("Error occured: ", err)

@@ -126,8 +126,14 @@ func main() {
 
 		for _, did := range deployments {
 			did, _ := strconv.Atoi(did)
+			id, _ := strconv.Atoi(m["SRC_CUST_ID"])
 
-			result := s.findMatches(did, m["SRC_CUST_ID"], m["CUST_NAME"], m["CNTRY"], m["CITY"], fn, mn, ln)
+			if m["CNTRY"] == "" {
+				fmt.Printf("\nNo country detected. Cannot continue because currently matching is based on the countries! Data: `%v`\n", m)
+				continue
+			}
+
+			result := s.findMatches(did, id, m["CUST_NAME"], m["CNTRY"], m["CITY"], fn, mn, ln)
 			// _, matches := s.findMatches(did, m["SRC_CUST_ID"], m["City"], fn, mn, ln)
 
 			for queryNumber, matches := range result {
@@ -137,9 +143,9 @@ func main() {
 						kid := int(kid64)
 
 						if kid > 0 {
-							fmt.Printf("{q%d}: [%s] %s %s %s {%s}\t\t ====> \t [%d] (did:%d) %s, {%s} npi: %v, ttid: %v\n",
-								queryNumber, m["SRC_CUST_ID"], fn, mn, ln, m["CITY"],
-								kid, did, match["name"], match["city"], match["npi"], match["ttid"],
+							fmt.Printf("{q%d}: [%s] %s %s %s {%s, %s}\t\t ====> \t [%d] (did:%d) %s, {%s, %s} npi: %v, ttid: %v\n",
+								queryNumber, m["SRC_CUST_ID"], fn, mn, ln, m["CITY"], m["CNTRY"],
+								kid, did, match["name"], match["city"], match["country"], match["npi"], match["ttid"],
 							)
 
 							wg.Add(1)
@@ -161,7 +167,7 @@ func main() {
 }
 
 // func (s *service) findMatches(did int, id, custName, city, fn, mn, ln string) (queryNumber int, result []map[string]interface{}) {
-func (s *service) findMatches(did int, id, custName, country, city, fn, mn, ln string) (result map[int][]map[string]interface{}) {
+func (s *service) findMatches(did, id int, custName, country, city, fn, mn, ln string) (result map[int][]map[string]interface{}) {
 	// this cannot seat in the return definition because it will panic below [assignment to entry in nil map]
 	result = map[int][]map[string]interface{}{}
 
@@ -170,14 +176,12 @@ func (s *service) findMatches(did int, id, custName, country, city, fn, mn, ln s
 		return
 	}
 
-	var ids []string
 	var midres []map[string]interface{}
 	var noq = 5 // number of queries
+	exclIDs := []string{strconv.Itoa(id)}
 
 	for i := 1; i <= noq; i++ {
-		// for _, queryNumber := range []int{1, 2, 3, 4, 5} {
-
-		midres = s.search(i, id, custName, fn, mn, ln, country, city, did, ids) //deployment=XX
+		midres = s.search(i, custName, fn, mn, ln, country, city, did, exclIDs) //deployment=XX
 
 		// before, it was a return when we had a match inside this for-loop
 		// I introduced another for-loop underneath to append all the results from every search step
@@ -202,7 +206,7 @@ func (s *service) findMatches(did int, id, custName, country, city, fn, mn, ln s
 		// this can happen only if const collectFromEveryStep=true -> so it will collect the results from
 		// every single search step
 		for _, row := range midres {
-			ids = append(ids, strconv.FormatFloat(row["id"].(float64), 'f', 0, 64))
+			exclIDs = append(exclIDs, strconv.FormatFloat(row["id"].(float64), 'f', 0, 64))
 
 			result[i] = append(result[i], row)
 		}
@@ -239,14 +243,14 @@ func names(m map[string]string) (fn, mn, ln string) {
 	return
 }
 
-func (s *service) search(option int, id, custName, fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+func (s *service) search(option int, custName, fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	switch option {
 	case 1:
-		return s.es.SimpleSearch(id, custName, fn, mn, ln, country, city, did, exclIDs)
+		return s.es.SimpleSearch(fn, mn, ln, country, city, did, exclIDs)
 	case 2:
-		return s.es.ShortSearch(id, custName, fn, mn, ln, country, city, did, exclIDs)
+		return s.es.ShortSearch(fn, mn, ln, country, city, did, exclIDs)
 	case 3:
-		r := s.es.NoMiddleNameSearch(id, custName, fn, mn, ln, country, city, did, exclIDs)
+		r := s.es.NoMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 
 		// for security reason - double checking if the match is the only one in the DB
 		for _, row := range r {
@@ -262,7 +266,7 @@ func (s *service) search(option int, id, custName, fn, mn, ln, country, city str
 
 		return result
 	case 4:
-		r := s.es.OneMiddleNameSearch(id, custName, fn, mn, ln, country, city, did, exclIDs)
+		r := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 
 		unique := map[string]string{}
 		for _, row := range r {
@@ -299,7 +303,7 @@ func (s *service) search(option int, id, custName, fn, mn, ln, country, city str
 
 		return result
 	case 5:
-		r := s.es.OneMiddleNameSearch2(id, custName, fn, mn, ln, country, city, did, exclIDs)
+		r := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
 
 		// for security reason - double checking if the match is the only one in the DB
 		for _, row := range r {
@@ -315,7 +319,7 @@ func (s *service) search(option int, id, custName, fn, mn, ln, country, city str
 
 		return result
 	default:
-		return s.es.TestSearch(id, custName, fn, mn, ln, country, city, did, exclIDs)
+		return s.es.TestSearch(fn, mn, ln, country, city, did, exclIDs)
 		return nil
 	}
 }
