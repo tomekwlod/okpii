@@ -89,6 +89,11 @@ func (db *DB) CountOneKeyOcc(custName, fn, ln string) int64 {
 	return counter
 }
 
+func newTrue() *bool {
+	b := true
+	return &b
+}
+
 func (db *DB) Onekeys(out chan<- map[string]string) {
 	defer close(out)
 
@@ -109,9 +114,10 @@ func (db *DB) Onekeys(out chan<- map[string]string) {
 		{"CITY", 1},
 		{"CNTRY", 1},
 	})
+	options.NoCursorTimeout = newTrue()
 	// options.SetLimit(10)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 6*600*time.Second) // 10min * 6 = 1h
+	ctx, cancel := context.WithTimeout(context.Background(), 10*6*600*time.Second) // 10*6*10min = 10h
 	defer cancel()
 	cur, err := collection.Find(ctx, filter, options)
 	if err != nil {
@@ -120,7 +126,7 @@ func (db *DB) Onekeys(out chan<- map[string]string) {
 
 	// Finding multiple documents returns a cursor
 	// Iterating through the cursor allows us to decode documents one at a time
-	for cur.Next(context.TODO()) {
+	for cur.Next(ctx) {
 		// create a value into which the single document can be decoded
 		var elem map[string]string
 
