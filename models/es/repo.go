@@ -88,10 +88,10 @@ func lastNameQuery(q *elastic.BoolQuery, ln string) *elastic.BoolQuery {
 
 	qs = append(qs, elastic.NewMatchPhraseQuery("ln", ln))
 
-	// if !strutils.IsASCII(ln) {
-	// @todo: test how many fewer results we have! with:3= without:3=
-	qs = append(qs, elastic.NewMatchPhraseQuery("ln.german", ln))
-	// }
+	if !strutils.IsASCII(ln) {
+		// @todo: test how many fewer results we have! with:3= without:3=
+		qs = append(qs, elastic.NewMatchPhraseQuery("ln.german", ln))
+	}
 
 	q.Should(
 		qs...,
@@ -155,10 +155,10 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	q.Should(elastic.NewTermQuery("nameKeywordRaw", nameRaw))
 
 	// only if the given name is with nonASCII we should add the german(and other) languages support
-	// if !strutils.IsASCII(name) {
-	// @todo: test how many less results we have!
-	q.Should(elastic.NewTermQuery("nameKeyword.german", name))
-	// }
+	if !strutils.IsASCII(name) {
+		// @todo: test how many less results we have!
+		q.Should(elastic.NewTermQuery("nameKeyword.german", name))
+	}
 
 	if name1 != name {
 		// John M Smith <- with ASCII-folding

@@ -185,109 +185,22 @@ func (s *service) matchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exclIDs := []string{strconv.Itoa(k.ID)}
+
 	// searching
-	m := s.es.SimpleSearch(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
-	for _, row := range m {
-		id := int(row["id"].(float64))
-		row["type"] = "simple"
-		result[id] = row
-		// result = append(result, strconv.FormatFloat(row["id"].(float64), 'f', 0, 64))
-	}
-	m = s.es.ShortSearch(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
-	for _, row := range m {
-		id := int(row["id"].(float64))
-		row["type"] = "short"
-		result[id] = row
-	}
-
-	mn0 := s.es.NoMiddleNameSearch(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
-	if len(mn0) > 0 {
-		// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
-		q, err := s.es.BaseQuery(k.DID, "", exclIDs)
-		if err != nil {
-			s.logger.Println("Error detected", err)
-			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
-			return
-		}
-
-		q.Must(elastic.NewMatchPhraseQuery("ln", k.Ln))
-		q.Must(elastic.NewPrefixQuery("fn", strutils.FirstChar(k.Fn)))
-		rows, err := s.es.ExecuteQuery(q)
-		if err != nil {
-			s.logger.Println("Error detected", err)
-			WriteError(w, &Error{"not_found", 404, "Error detected", err.Error()})
-			return
-		}
-
-		if len(rows) == 1 {
-			for _, row := range rows {
-				id := int(row["id"].(float64))
-				row["type"] = "nomid"
-				result[id] = row
-			}
-		} else {
-			s.logger.Println("There is more people with the same initials Fn% Ln")
-		}
-	}
-
-	mn1 := s.es.OneMiddleNameSearch(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
-	if len(mn1) > 0 {
-		// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
-		q, err := s.es.BaseQuery(k.DID, "", nil)
-		if err != nil {
-			s.logger.Println("Error detected", err)
-			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
-			return
-		}
-
-		q.Must(elastic.NewMatchPhraseQuery("ln", k.Ln))
-		q.Must(elastic.NewMatchPhraseQuery("fn", k.Fn))
-		rows, err := s.es.ExecuteQuery(q)
-		if err != nil {
-			s.logger.Println("Error detected", err)
-			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
-			return
-		}
-
-		if len(rows) == 1 {
-			for _, row := range rows {
-				id := int(row["id"].(float64))
-				row["type"] = "onemid1"
-				result[id] = row
-			}
-		} else {
-			s.logger.Println("There is more people with the same initials Fn *Mn* Ln")
-		}
-	}
-
-	mn2 := s.es.OneMiddleNameSearch2(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
-	if len(mn2) > 0 {
-		// we have to check here how many other fn-ln we have, if more than one we cannot merge here
-		q, err := s.es.BaseQuery(k.DID, "", exclIDs)
-		if err != nil {
-			s.logger.Println("Error detected", err)
-			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
-			return
-		}
-
-		q.Must(elastic.NewMatchPhraseQuery("ln", k.Ln))
-		q.Must(elastic.NewMatchPhraseQuery("fn", k.Fn))
-		rows, err := s.es.ExecuteQuery(q)
-		if err != nil {
-			s.logger.Println("Error detected", err)
-			WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
-			return
-		}
-
-		if len(rows) == 1 {
-			for _, row := range rows {
-				id := int(row["id"].(float64))
-				row["type"] = "onemid2"
-				result[id] = row
-			}
-		} else {
-			s.logger.Println("There is more people with the same initials Fn1% Ln")
-		}
+	// search query one-by-one. Cannot collect results from all of the queries because of of the merge
+	// can change an expert signature so the next match may not work anymore
+	// eg:
+	// for an expert Xin-xia  Li we found
+	//   Xin-xia  Li (3243)      <------- removed
+	//   Xin      Li (909)       <--- HERE WE CHANGE THE EXPERT SIGNATURE WHICH WONT MATCH WITH THE BELOW ONE ANYMORE
+	// and:
+	//   X   X  Li (3243)        <------- removed
+	//   Xin    Li (909)		 <--- THIS IS ACTUALLY NOT TRUE, IT IS :    Xin-xia  Li <--> X X  Li
+	result, err = s.findMatches(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
+	if err != nil {
+		s.logger.Println("Error detected", err)
+		WriteError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
+		return
 	}
 
 	s.logger.Println(result)
@@ -344,4 +257,119 @@ func (s *service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(204)
 	w.Write([]byte("\n"))
+}
+
+// export me to repo.go ?
+//
+//
+//
+//
+func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs []string) (map[int]interface{}, error) {
+	result := map[int]interface{}{}
+
+	for i := 1; i <= 5; i++ {
+		switch i {
+		case 1:
+			m := s.es.SimpleSearch(fn, mn, ln, country, city, did, exclIDs)
+			for _, row := range m {
+				id := int(row["id"].(float64))
+				row["type"] = "simple"
+				result[id] = row
+			}
+			return result, nil
+		case 2:
+			m := s.es.ShortSearch(fn, mn, ln, country, city, did, exclIDs)
+			for _, row := range m {
+				id := int(row["id"].(float64))
+				row["type"] = "short"
+				result[id] = row
+			}
+			return result, nil
+		case 3:
+			mn0 := s.es.NoMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
+			if len(mn0) > 0 {
+				// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
+				q, err := s.es.BaseQuery(did, "", exclIDs)
+				if err != nil {
+					return nil, err
+				}
+
+				q.Must(elastic.NewMatchPhraseQuery("ln", ln))
+				q.Must(elastic.NewPrefixQuery("fn", strutils.FirstChar(fn)))
+				rows, err := s.es.ExecuteQuery(q)
+				if err != nil {
+					return nil, err
+				}
+
+				if len(rows) == 1 {
+					for _, row := range rows {
+						id := int(row["id"].(float64))
+						row["type"] = "nomid"
+						result[id] = row
+					}
+				} else {
+					s.logger.Println("There is more people with the same initials Fn% Ln")
+				}
+			}
+			return result, nil
+		case 4:
+			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
+			if len(mn1) > 0 {
+				// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
+				q, err := s.es.BaseQuery(did, "", nil)
+				if err != nil {
+					return nil, err
+				}
+
+				q.Must(elastic.NewMatchPhraseQuery("ln", ln))
+				q.Must(elastic.NewMatchPhraseQuery("fn", fn))
+				rows, err := s.es.ExecuteQuery(q)
+				if err != nil {
+					return nil, err
+				}
+
+				if len(rows) == 1 {
+					for _, row := range rows {
+						id := int(row["id"].(float64))
+						row["type"] = "onemid1"
+						result[id] = row
+					}
+				} else {
+					s.logger.Println("There is more people with the same initials Fn *Mn* Ln")
+				}
+			}
+			return result, nil
+		case 5:
+			mn2 := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
+			if len(mn2) > 0 {
+				// we have to check here how many other fn-ln we have, if more than one we cannot merge here
+				q, err := s.es.BaseQuery(did, "", exclIDs)
+				if err != nil {
+					return nil, err
+				}
+
+				q.Must(elastic.NewMatchPhraseQuery("ln", ln))
+				q.Must(elastic.NewMatchPhraseQuery("fn", fn))
+				rows, err := s.es.ExecuteQuery(q)
+				if err != nil {
+					return nil, err
+				}
+
+				if len(rows) == 1 {
+					for _, row := range rows {
+						id := int(row["id"].(float64))
+						row["type"] = "onemid2"
+						result[id] = row
+					}
+				} else {
+					s.logger.Println("There is more people with the same initials Fn1% Ln")
+				}
+			}
+			return result, nil
+		default:
+			return nil, nil
+		}
+	}
+
+	return nil, nil
 }
