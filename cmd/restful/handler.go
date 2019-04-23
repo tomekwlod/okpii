@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/context"
 	"github.com/julienschmidt/httprouter"
 	"github.com/tomekwlod/okpii/models"
+	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
 	strutils "github.com/tomekwlod/utils/strings"
 	elastic "gopkg.in/olivere/elastic.v6"
 )
@@ -65,12 +66,13 @@ func recoverHandler(next http.Handler) http.Handler {
 
 func (s *service) loggingHandler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
+		s.logger.Printf("[%s] ip:%s START %q\n", r.Method, r.RemoteAddr, r.URL.String())
+
 		t1 := time.Now()
 		next.ServeHTTP(w, r)
 		t2 := time.Now()
 
-		s.logger.Printf("[%s] %q %v\n", r.Method, r.URL.String(), t2.Sub(t1))
-		// log.Printf("[%s] %q %v\n", r.Method, r.URL.String(), t2.Sub(t1))
+		s.logger.Printf("[%s] ip:%s DONE %q %v\n", r.Method, r.RemoteAddr, r.URL.String(), t2.Sub(t1))
 	}
 
 	return http.HandlerFunc(fn)
@@ -163,6 +165,53 @@ func (s *service) expertsHandler(w http.ResponseWriter, r *http.Request) {
 		DeploymentID int `json:"deploymentId"`
 	}
 	json.NewEncoder(w).Encode(resp{Experts: count, DeploymentID: did})
+}
+
+func (s *service) dumpHandler(w http.ResponseWriter, r *http.Request) {
+	params := context.Get(r, "params").(httprouter.Params)
+	did, err := strconv.Atoi(params.ByName("did"))
+	if err != nil {
+		WriteError(w, &Error{"wrong_parameter", 400, "Parameter provided couldn't be used", "One of the parameters is in wrong format."})
+		return
+	}
+
+	var experts []*modelsMysql.Experts
+	lastID, total := 0, 0
+
+	for {
+		// getting the experts from the MySQL
+		lastID, experts, err = s.mysql.FetchExperts(lastID, did, 3000, nil)
+		if err != nil {
+			WriteError(w, &Error{"data_error", 400, "Couldn't retrieve the data", err.Error()})
+			return
+		}
+
+		quantity := len(experts)
+		total += quantity
+
+		// stop if no results
+		if quantity == 0 {
+			break
+		}
+
+		// indexing the experts onto ES
+		err = s.es.IndexExperts(experts, 3000)
+		if err != nil {
+			WriteError(w, &Error{"index_error", 400, "Coudn't index the data", err.Error()})
+			return
+		}
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
+	w.Header().Set("Content-Type", "application/json")
+
+	type resp struct {
+		Experts      int `json:"experts"`
+		DeploymentID int `json:"deploymentId"`
+	}
+	json.NewEncoder(w).Encode(resp{Experts: total, DeploymentID: did})
 }
 
 // @todo: THIS NEEDS REFACTORING! IT IS JUST AN INITIAL BRIEF

@@ -6,19 +6,23 @@ import (
 	"net/http"
 	"os"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/context"
 	"github.com/justinas/alice"
 	"github.com/tomekwlod/okpii/models"
 	modelsES "github.com/tomekwlod/okpii/models/es"
+	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
 )
 
 // service struct to hold the db and the logger
 type service struct {
 	es     modelsES.Repository
+	mysql  modelsMysql.Repository
 	logger *log.Logger
 }
 
 func main() {
+
 	// definig the logger & a log file
 	file, err := os.OpenFile("log/http.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -32,8 +36,15 @@ func main() {
 		log.Fatalln("Failed to connect to ES", err)
 	}
 
+	mysqlClient, err := modelsMysql.MysqlClient()
+	if err != nil {
+		log.Fatalln("Failed to connect to MySQL", err)
+	}
+	defer mysqlClient.Close()
+
 	s := &service{
 		es:     esClient,
+		mysql:  mysqlClient,
 		logger: l,
 	}
 
@@ -41,6 +52,10 @@ func main() {
 	optionsHandlers := alice.New(context.ClearHandler, s.loggingHandler)
 
 	router := NewRouter()
+
+	// dump experts for one deployment
+	router.Get("/dump/:did", commonHandlers.ThenFunc(s.dumpHandler))
+	// counter
 	router.Get("/experts/:did", commonHandlers.ThenFunc(s.expertsHandler))
 	// create
 	router.Post("/match", commonHandlers.Append(contentTypeHandler, bodyHandler(models.Expert{})).ThenFunc(s.matchHandler))

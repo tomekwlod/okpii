@@ -136,6 +136,8 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 		return nil
 	}
 
+	// rln := strutils.LastWord(ln)
+
 	mnstr := " "
 	mn1 := ""
 	if mn != "" {
@@ -146,6 +148,16 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	name := fn + mnstr + ln
 	nameRaw := strings.Replace(strings.Replace(name, " ", "", -1), "-", "", -1)
 	name1 := fn + mn1 + ln
+
+	if len(nameRaw) <= 5 {
+		// to avoid very weak merging and to temporary eliminate:
+		// Ma  Li
+		// M  Ali
+		// or
+		// S  Yan
+		// S Y An
+		return nil
+	}
 
 	// John Mark Smith || Brian Surni <- with ASCII-folding
 	q.Should(elastic.NewTermQuery("nameKeyword", name))
@@ -171,6 +183,19 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 
 	q.MinimumShouldMatch("1")
 
+	// disabled because we would not match a lot of good examples, eg:
+	//  Joaquín Pastor Fernández
+	//  Joaquín Pastor Ferná Ndez
+	// ... needs more thinking
+	//
+	// // this is to avoid matching:
+	// //  Ma  Li
+	// //  M  Ali
+	// // or
+	// //  S  Yan
+	// //  S Y An
+	// q.Must(elastic.NewMatchPhraseQuery("name", rln))
+
 	// this is the best if we want to print the query for the test purposes
 	nss := elastic.NewSearchSource().Query(q)
 
@@ -185,18 +210,18 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	}
 
 	if searchResult.Hits.TotalHits > 2 {
-		// fmt.Printf("  !!!!!! (simple)  Too many (%d) results %s;\n", searchResult.Hits.TotalHits, id)
+		fmt.Printf("\n\n\n!!!!!! (simple)  Too many (%d) results %s;\n\n\n", searchResult.Hits.TotalHits, name)
 		// fmt.Printf("[%s] %s %s %s\n", id, fn, mn, ln)
 
-		for _, hit := range searchResult.Hits.Hits {
-			var row map[string]interface{}
+		// for _, hit := range searchResult.Hits.Hits {
+		// 	var row map[string]interface{}
 
-			err := json.Unmarshal(*hit.Source, &row)
-			if err != nil {
-				panic(err)
-			}
-			// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
-		}
+		// 	err := json.Unmarshal(*hit.Source, &row)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
+		// }
 		return nil
 	}
 
