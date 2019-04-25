@@ -56,7 +56,7 @@ func main() {
 	)
 	optionsHandlers := alice.New(context.ClearHandler, s.loggingHandler)
 
-	router := NewRouter()
+	router := newRouter()
 
 	// dump experts for one deployment - takes time
 	router.Get(

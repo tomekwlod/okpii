@@ -3,12 +3,24 @@ package main
 import (
 	"net/http"
 
+	"github.com/gorilla/context"
 	"github.com/julienschmidt/httprouter"
 )
 
 // Router
 type router struct {
 	*httprouter.Router
+}
+
+func newRouter() *router {
+	return &router{httprouter.New()}
+}
+
+func wrapHandler(h http.Handler) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		context.Set(r, "params", ps)
+		h.ServeHTTP(w, r)
+	}
 }
 
 func (r *router) Get(path string, handler http.Handler) {
@@ -29,8 +41,4 @@ func (r *router) Delete(path string, handler http.Handler) {
 
 func (r *router) Options(path string, handler http.Handler) {
 	r.OPTIONS(path, wrapHandler(handler))
-}
-
-func NewRouter() *router {
-	return &router{httprouter.New()}
 }
