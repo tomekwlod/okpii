@@ -48,11 +48,13 @@ func wrapHandler(h http.Handler) httprouter.Handle {
 }
 
 // Middlewares
-func recoverHandler(next http.Handler) http.Handler {
+
+// recoverHandler deals with the panics
+func (s *service) recoverHandler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				// s.logger.Printf("panic: %+v", err)
+				s.logger.Printf("panic: %+v", err)
 				WriteError(w, errInternalServer)
 				return
 			}

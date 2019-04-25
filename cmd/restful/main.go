@@ -48,26 +48,53 @@ func main() {
 		logger: l,
 	}
 
-	commonHandlers := alice.New(context.ClearHandler, s.loggingHandler, recoverHandler, acceptHandler)
+	commonHandlers := alice.New(
+		context.ClearHandler, // ClearHandler wraps an http.Handler and clears request values at the end of a request lifetime
+		s.loggingHandler,     // displaying logs in a consistent way
+		s.recoverHandler,     // deals with the panic-s
+		acceptHandler,        // accepts only requests types we want
+	)
 	optionsHandlers := alice.New(context.ClearHandler, s.loggingHandler)
 
 	router := NewRouter()
 
-	// dump experts for one deployment
-	router.Get("/dump/:did", commonHandlers.ThenFunc(s.dumpHandler))
-	// counter
-	router.Get("/experts/:did", commonHandlers.ThenFunc(s.expertsHandler))
-	// create
-	router.Post("/match", commonHandlers.Append(contentTypeHandler, bodyHandler(models.Expert{})).ThenFunc(s.matchHandler))
-	// delete
-	router.Delete("/expert/:id", commonHandlers.ThenFunc(s.deleteHandler))
-	// update
-	router.Put("/expert/:id", commonHandlers.Append(contentTypeHandler, bodyHandler(models.Expert{})).ThenFunc(s.updateHandler))
+	// dump experts for one deployment - takes time
+	router.Get(
+		"/dump/:did",
+		commonHandlers.ThenFunc(s.dumpHandler))
 
-	// cors support
-	router.Options("/*name", optionsHandlers.ThenFunc(allowCorsHandler))
+	// counting experts for one deployment
+	router.Get(
+		"/experts/:did",
+		commonHandlers.ThenFunc(s.expertsHandler))
 
-	l.Printf("Server started and listening on port %s. Ready for the requests.\n\n", "7171")
+	// marks expert as deleted
+	router.Delete(
+		"/expert/:id",
+		commonHandlers.ThenFunc(s.deleteHandler))
+
+	// finding a match for a given expert details
+	router.Post(
+		"/match",
+		commonHandlers.Append(
+			contentTypeHandler,
+			bodyHandler(models.Expert{}),
+		).ThenFunc(s.matchHandler))
+
+	// update expert's details
+	router.Put(
+		"/expert/:id",
+		commonHandlers.Append(
+			contentTypeHandler,
+			bodyHandler(models.Expert{}),
+		).ThenFunc(s.updateHandler))
+
+	// CORS support
+	router.Options(
+		"/*name",
+		optionsHandlers.ThenFunc(allowCorsHandler))
+
+	l.Printf("\n\n----------------------\nListening on port %s\n\n", "7171")
 	if err := http.ListenAndServe(":7171", router); err != nil {
 		l.Panic("Error occured: ", err)
 	}
