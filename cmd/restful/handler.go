@@ -155,18 +155,12 @@ func (s *service) expertsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count := s.es.Count(did)
-
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
-	w.Header().Set("Content-Type", "application/json")
-
 	type resp struct {
 		Experts      int `json:"experts"`
 		DeploymentID int `json:"deploymentId"`
 	}
-	json.NewEncoder(w).Encode(resp{Experts: count, DeploymentID: did})
+
+	sendResponse(w, resp{Experts: s.es.Count(did), DeploymentID: did})
 }
 
 func (s *service) dumpHandler(w http.ResponseWriter, r *http.Request) {
@@ -204,16 +198,12 @@ func (s *service) dumpHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
-	w.Header().Set("Content-Type", "application/json")
-
 	type resp struct {
 		Experts      int `json:"experts"`
 		DeploymentID int `json:"deploymentId"`
 	}
-	json.NewEncoder(w).Encode(resp{Experts: total, DeploymentID: did})
+
+	sendResponse(w, resp{Experts: total, DeploymentID: did})
 }
 
 // @todo: THIS NEEDS REFACTORING! IT IS JUST AN INITIAL BRIEF
@@ -254,15 +244,9 @@ func (s *service) matchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.logger.Println(result)
-
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
-	w.Header().Set("Content-Type", "application/json")
-
 	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(result)
+
+	sendResponse(w, result)
 }
 
 func (s *service) updateHandler(w http.ResponseWriter, r *http.Request) {
@@ -423,4 +407,13 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 	}
 
 	return nil, nil
+}
+
+func sendResponse(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
+	w.Header().Add("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(data)
 }
