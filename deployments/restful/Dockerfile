@@ -17,4 +17,4 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 COPY --from=builder /go/src/app/cmd/restful/restful .
 
-# CMD [ "./restful" ]
+CMD [ "./restful" ]
