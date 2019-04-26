@@ -67,6 +67,7 @@ func (db *DB) CountOneKeyOcc(custName, fn, ln string) int64 {
 		ifn = primitive.Regex{Pattern: "^" + fn + ".*", Options: ""}
 	}
 
+	// db.collection.find({SRC_LAST_NAME:"ALDERS",SRC_FIRST_NAME:/^M.*/}).count()
 	filter := bson.D{
 		{"FIRST_NAME", ifn},
 		{"LAST_NAME", ln},

@@ -120,7 +120,8 @@ func main() {
 			if m["SRC_CUST_ID"] != singleOK {
 				continue
 			} else {
-				fmt.Printf("%s :: %s :: %s", fn, mn, ln)
+				fmt.Printf("\n>>> Found in OneKey db ---> %s :: %s :: %s\n", fn, mn, ln)
+				fmt.Printf(">>> Searching for the matches ... \n")
 			}
 		}
 
@@ -130,14 +131,15 @@ func main() {
 
 			if m["CNTRY"] == "" {
 				fmt.Printf("\nNo country detected. Cannot continue because currently matching is based on the countries! Data: `%v`\n", m)
+
 				continue
 			}
 
 			result := s.findMatches(did, id, m["CUST_NAME"], m["CNTRY"], m["CITY"], fn, mn, ln)
-			// _, matches := s.findMatches(did, m["SRC_CUST_ID"], m["City"], fn, mn, ln)
 
 			for queryNumber, matches := range result {
 				for _, match := range matches {
+
 					if match["id"] != nil {
 						kid64 := match["id"].(float64)
 						kid := int(kid64)
@@ -156,6 +158,13 @@ func main() {
 						}
 					}
 				}
+			}
+		}
+
+		if singleOK != "" {
+			// to test only one person
+			if m["SRC_CUST_ID"] == singleOK {
+				break
 			}
 		}
 	}
@@ -177,7 +186,7 @@ func (s *service) findMatches(did, id int, custName, country, city, fn, mn, ln s
 	}
 
 	var midres []map[string]interface{}
-	var noq = 5 // number of queries
+	var noq = 6 // number of queries
 	exclIDs := []string{strconv.Itoa(id)}
 
 	for i := 1; i <= noq; i++ {
@@ -318,6 +327,10 @@ func (s *service) search(option int, custName, fn, mn, ln, country, city string,
 		}
 
 		return result
+	case 6:
+		r := s.es.ThreeInitialsSearch(fn, mn, ln, country, city, did, exclIDs)
+
+		return r
 	default:
 		return s.es.TestSearch(fn, mn, ln, country, city, did, exclIDs)
 		return nil

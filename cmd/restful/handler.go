@@ -160,16 +160,12 @@ func (s *service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("\n"))
 }
 
-// export me to repo.go ?
-//
-//
-//
-//
 func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs []string) (map[int]interface{}, error) {
 	result := map[int]interface{}{}
 
 	for i := 1; i <= 5; i++ {
 		switch i {
+
 		case 1:
 			m := s.es.SimpleSearch(fn, mn, ln, country, city, did, exclIDs)
 			for _, row := range m {
@@ -178,6 +174,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				result[id] = row
 			}
 			return result, nil
+
 		case 2:
 			m := s.es.ShortSearch(fn, mn, ln, country, city, did, exclIDs)
 			for _, row := range m {
@@ -186,6 +183,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				result[id] = row
 			}
 			return result, nil
+
 		case 3:
 			mn0 := s.es.NoMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 			if len(mn0) > 0 {
@@ -213,6 +211,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				}
 			}
 			return result, nil
+
 		case 4:
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 			if len(mn1) > 0 {
@@ -240,6 +239,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				}
 			}
 			return result, nil
+
 		case 5:
 			mn2 := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
 			if len(mn2) > 0 {
@@ -267,6 +267,17 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				}
 			}
 			return result, nil
+
+		case 6:
+			r := s.es.ThreeInitialsSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			for _, row := range r {
+				id := int(row["id"].(float64))
+				row["type"] = "threein"
+				result[id] = row
+			}
+			return result, nil
+
 		default:
 			return nil, nil
 		}

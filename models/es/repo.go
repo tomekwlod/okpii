@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"text/scanner"
+	"unicode"
 
 	"github.com/tomekwlod/okpii/models"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
@@ -364,8 +366,11 @@ func (db *DB) NoMiddleNameSearch(fn, mn, ln, country, city string, did int, excl
 	)
 
 	// fn exactly fn1
-	q.Must(elastic.NewMatchPhraseQuery("fn", strutils.FirstChar(fn)))
-
+	if len(fn) > 1 {
+		q.Must(elastic.NewMatchPhraseQuery("fn", strutils.FirstChar(fn)))
+	} else {
+		q.Must(elastic.NewPrefixQuery("fn", strutils.FirstChar(fn)))
+	}
 	nss := elastic.NewSearchSource().Query(q)
 
 	searchResult, err := db.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
@@ -512,6 +517,69 @@ func (db *DB) OneMiddleNameSearch2(fn, mn, ln, country, city string, did int, ex
 		}
 
 		result = append(result, row)
+	}
+
+	return
+}
+
+func (db *DB) ThreeInitialsSearch(fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	if mn != "" || len(fn) <= 1 {
+		// this case is only for the names with NO MN included
+		// also first name needs to be longer than 1 character
+
+		// ---------------------------
+		// -> GJ     OSSENKOPPELE
+		// 0. Gert J OSSENKOPPELE
+		return nil
+	}
+
+	q, err := baseQuery(did, country, exclIDs)
+	if err != nil {
+		return nil
+	}
+
+	// adding LN to a query
+	q = lastNameQuery(q, ln)
+
+	q.Filter(
+		elastic.NewPrefixQuery("fn", strutils.FirstChar(fn)),
+	)
+
+	nss := elastic.NewSearchSource().Query(q)
+
+	searchResult, err := db.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	if searchResult.Hits.TotalHits == 0 {
+		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
+		return nil
+	}
+
+	for _, hit := range searchResult.Hits.Hits {
+		var row map[string]interface{}
+
+		err := json.Unmarshal(*hit.Source, &row)
+		if err != nil {
+			panic(err)
+		}
+
+		// checking the initials
+		var initials []string
+		for _, char := range row["fn"].(string) + row["mn"].(string) {
+			if !unicode.IsLower(char) && char != ' ' {
+				var s string
+				s = scanner.TokenString(char)
+				s = s[1 : len(s)-1] // this removed the quotes around the string
+
+				initials = append(initials, s)
+			}
+		}
+
+		if strings.Join(initials, "") == fn {
+			result = append(result, row)
+		}
 	}
 
 	return

@@ -32,6 +32,7 @@ type Repository interface {
 	NoMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 	OneMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 	OneMiddleNameSearch2(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	ThreeInitialsSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 	TestSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 
 	// index
