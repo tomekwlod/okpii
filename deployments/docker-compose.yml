@@ -6,6 +6,16 @@
 version: '3'
 
 services:
+    go-restful:
+        container_name: okpii_restful
+        build:
+            context: ../
+            dockerfile: ./deployments/restful/Dockerfile
+        # command: filename
+        volumes:
+            - ../data/static:/root/static
+        env_file:
+            - .env
     go-import:
         container_name: okpii_import
         build:
@@ -51,7 +61,7 @@ services:
         environment:
             - cluster.name=docker-cluster
             - bootstrap.memory_lock=true
-            - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+            - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
         ulimits:
             memlock:
                 soft: -1
