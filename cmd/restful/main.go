@@ -95,7 +95,12 @@ func main() {
 		"/*name",
 		optionsHandlers.ThenFunc(allowCorsHandler))
 
-	l.Printf("\n\n----------------------\nListening on port %s\n\n", "7171")
+	port := "7171"
+	if os.Getenv("WEB_PORT") != "" {
+		port = os.Getenv("WEB_PORT")
+	}
+
+	l.Printf("\n\n----------------------\nListening on port %s\n\n", port)
 	if err := http.ListenAndServe(":7171", router); err != nil {
 		l.Panic("Error occured: ", err)
 	}
