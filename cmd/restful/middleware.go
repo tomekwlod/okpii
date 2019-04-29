@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"reflect"
 	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/context"
 )
 
@@ -14,6 +17,7 @@ var (
 	errNotAcceptable        = &Error{"not_acceptable", 406, "Not Acceptable", "Accept header must be set to 'application/json'."}
 	errUnsupportedMediaType = &Error{"unsupported_media_type", 415, "Unsupported Media Type", "Content-Type header must be set to: 'application/json'."}
 	errInternalServer       = &Error{"internal_server_error", 500, "Internal Server Error", "Something went wrong."}
+	errNotAuthorized        = &Error{"not_authorized_error", 403, "Not authorized", "Not authorized."}
 )
 
 // Errors
@@ -54,6 +58,36 @@ func (s *service) recoverHandler(next http.Handler) http.Handler {
 		}()
 
 		next.ServeHTTP(w, r)
+	}
+
+	return http.HandlerFunc(fn)
+}
+
+func (s *service) authHandler(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		if r.Header["Authorization"] != nil {
+
+			myKey := os.Getenv("JWT_TOKEN")
+
+			token, err := jwt.Parse(r.Header["Authorization"][0], func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("There was an error")
+				}
+				return myKey, nil
+			})
+
+			if err != nil {
+				fmt.Fprintf(w, err.Error())
+			}
+
+			if token.Valid {
+				next.ServeHTTP(w, r)
+			}
+		} else {
+			s.logger.Print("Not Authorized")
+			writeError(w, errNotAuthorized)
+			return
+		}
 	}
 
 	return http.HandlerFunc(fn)

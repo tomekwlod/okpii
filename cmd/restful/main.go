@@ -50,6 +50,7 @@ func main() {
 
 	commonHandlers := alice.New(
 		context.ClearHandler, // ClearHandler wraps an http.Handler and clears request values at the end of a request lifetime
+		s.authHandler,        // checking the auth
 		s.loggingHandler,     // displaying logs in a consistent way
 		s.recoverHandler,     // deals with the panic-s
 		acceptHandler,        // accepts only requests types we want
