@@ -13,6 +13,7 @@ destroy:
 	docker-compose rm -f
 
 rebuild:
+	# mkdir -p ../cmd/restful/log && chmod -R 777 ../cmd/restful/log/
 	make destroy
 	make build
 	make start

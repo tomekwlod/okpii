@@ -11,9 +11,9 @@ services:
         build:
             context: ../
             dockerfile: ./deployments/restful/Dockerfile
-        # command: filename
         volumes:
             - ../data/static:/root/static
+            - ../log:/root/log
         env_file:
             - .env
     go-import:
@@ -24,6 +24,7 @@ services:
         # command: filename
         volumes:
             - ../data/static:/root/static
+            - ../log:/root/log
             # - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
@@ -34,6 +35,7 @@ services:
             dockerfile: ./deployments/dump/Dockerfile
         volumes:
             - ../data/static:/root/static
+            - ../log:/root/log
             # - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
@@ -44,6 +46,7 @@ services:
             dockerfile: ./deployments/matching/Dockerfile
         volumes:
             - ../data/static:/root/static
+            - ../log:/root/log
             # - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
