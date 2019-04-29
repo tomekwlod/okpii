@@ -101,7 +101,7 @@ func main() {
 	}
 
 	l.Printf("\n\n----------------------\nListening on port %s\n\n", port)
-	if err := http.ListenAndServe(":7171", router); err != nil {
+	if err := http.ListenAndServe(":"+port, router); err != nil {
 		l.Panic("Error occured: ", err)
 	}
 }

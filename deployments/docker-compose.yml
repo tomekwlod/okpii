@@ -16,6 +16,11 @@ services:
             - ../log:/root/log
         env_file:
             - .env
+        depends_on:
+            - "elasticsearch"
+        ports:
+            - ${WEB_PORT}:${WEB_PORT}
+        restart: on-failure
     go-import:
         container_name: okpii_import
         build:
@@ -28,6 +33,8 @@ services:
             # - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
+        depends_on:
+            - "elasticsearch"
     go-dump:
         container_name: okpii_dump
         build:
@@ -39,6 +46,8 @@ services:
             # - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
+        depends_on:
+            - "elasticsearch"
     go-matching:
         container_name: okpii_matching
         build:
@@ -50,6 +59,8 @@ services:
             # - ~/.ssh/id_rsa:/root/.ssh/id_rsa
         env_file:
             - .env
+        depends_on:
+            - "elasticsearch"
     elasticsearch:
         container_name: ${ES_NAME}
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html
@@ -73,6 +84,8 @@ services:
             - ../data/es:/usr/share/elasticsearch/data
         ports:
             - ${ES_EXT_PORT}:${ES_PORT}
+            # - 9202:9200
+        restart: on-failure
 networks:
     default:
         driver: bridge
