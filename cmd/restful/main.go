@@ -22,7 +22,6 @@ type service struct {
 }
 
 func main() {
-
 	// definig the logger & a log file
 	file, err := os.OpenFile("log/http.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -50,9 +49,9 @@ func main() {
 
 	commonHandlers := alice.New(
 		context.ClearHandler, // ClearHandler wraps an http.Handler and clears request values at the end of a request lifetime
-		s.authHandler,        // checking the auth
 		s.loggingHandler,     // displaying logs in a consistent way
 		s.recoverHandler,     // deals with the panic-s
+		s.authHandler,        // checking the auth
 		acceptHandler,        // accepts only requests types we want
 	)
 	optionsHandlers := alice.New(context.ClearHandler, s.loggingHandler)

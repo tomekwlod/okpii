@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -65,28 +66,65 @@ func (s *service) recoverHandler(next http.Handler) http.Handler {
 
 func (s *service) authHandler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		if r.Header["Authorization"] != nil {
 
-			myKey := os.Getenv("JWT_TOKEN")
-
-			token, err := jwt.Parse(r.Header["Authorization"][0], func(token *jwt.Token) (interface{}, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("There was an error")
-				}
-				return myKey, nil
-			})
-
-			if err != nil {
-				fmt.Fprintf(w, err.Error())
-			}
-
-			if token.Valid {
-				next.ServeHTTP(w, r)
-			}
-		} else {
-			s.logger.Print("Not Authorized")
-			writeError(w, errNotAuthorized)
+		// JWT_TOKEN has to be declared! It will be either used as an OpenToken if the JWT is disabled
+		//  or it will be used as a secret within the JWT mechanism
+		key := os.Getenv("JWT_TOKEN")
+		if key == "" {
+			s.logger.Print("No JWT Token detected in .env")
+			writeError(w, errInternalServer)
 			return
+		}
+
+		jwtEnabled, err := strconv.ParseBool(os.Getenv("JWT_ENABLED"))
+		if err != nil {
+			jwtEnabled = false
+		}
+
+		if !jwtEnabled {
+
+			// OPEN TOKEN WAY
+			if r.Header.Get("OpenToken") != "" {
+				if r.Header.Get("OpenToken") == key {
+					next.ServeHTTP(w, r)
+				} else {
+					s.logger.Print("OpenToken key found but it doesn't match with the .env one")
+					writeError(w, errNotAuthorized)
+					return
+				}
+			} else {
+				s.logger.Print("No OpenToken key found in header")
+				writeError(w, errNotAuthorized)
+				return
+			}
+
+			// JWT WAY
+			// also Authorisation header needs to be filled in
+		} else if jwtEnabled == true {
+			if r.Header["Authorization"] != nil {
+
+				token, err := jwt.Parse(r.Header["Authorization"][0], func(token *jwt.Token) (interface{}, error) {
+					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+						return nil, fmt.Errorf("There was an error")
+					}
+					return []byte(key), nil
+				})
+
+				if err != nil {
+					s.logger.Printf("JWT encryption error: %s", err.Error())
+					writeError(w, &Error{"authorization_error", 500, "Authorization error", "authorization error."})
+				}
+
+				fmt.Println(token.Claims)
+
+				if token.Valid {
+					next.ServeHTTP(w, r)
+				}
+			} else {
+				s.logger.Print("Not Authorized")
+				writeError(w, errNotAuthorized)
+				return
+			}
 		}
 	}
 

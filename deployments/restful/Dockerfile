@@ -6,8 +6,8 @@ WORKDIR ${WORKDIR}
 COPY . .
 
 RUN go get -u github.com/golang/dep/cmd/dep \
-    && dep init && dep ensure \
     && cd ${WORKDIR}/cmd/restful \
+    && dep init && dep ensure \
     && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o restful .
 
 # # Second step - copying the files and running the exec

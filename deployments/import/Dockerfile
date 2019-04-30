@@ -6,8 +6,8 @@ WORKDIR ${WORKDIR}
 COPY . .
 
 RUN go get -u github.com/golang/dep/cmd/dep \
-    && dep init -v && dep ensure \
     && cd ${WORKDIR}/cmd/import \
+    && dep init -v && dep ensure \
     && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o import .
 
 # # Second step - copying the files and running the exec
