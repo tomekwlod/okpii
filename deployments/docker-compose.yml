@@ -84,7 +84,6 @@ services:
             - ../data/es:/usr/share/elasticsearch/data
         ports:
             - ${ES_EXT_PORT}:${ES_PORT}
-            # - 9202:9200
         restart: on-failure
 networks:
     default:

@@ -44,6 +44,8 @@ func sendResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Access-Control-Allow-Methods", "POST, DELETE, PUT")
 	w.Header().Add("Content-Type", "application/json")
 
+	w.WriteHeader(200)
+
 	json.NewEncoder(w).Encode(data)
 }
 
@@ -66,6 +68,7 @@ func (s *service) recoverHandler(next http.Handler) http.Handler {
 
 func (s *service) authHandler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
+		// https://medium.com/@adigunhammedolalekan/build-and-deploy-a-secure-rest-api-with-go-postgresql-jwt-and-gorm-6fadf3da505b
 
 		// JWT_TOKEN has to be declared! It will be either used as an OpenToken if the JWT is disabled
 		//  or it will be used as a secret within the JWT mechanism

@@ -29,6 +29,10 @@ func (s *service) expertsHandler(w http.ResponseWriter, r *http.Request) {
 	sendResponse(w, resp{Experts: s.es.Count(did), DeploymentID: did})
 }
 
+func (s *service) pingHandler(w http.ResponseWriter, r *http.Request) {
+	sendResponse(w, "OK")
+}
+
 func (s *service) dumpHandler(w http.ResponseWriter, r *http.Request) {
 	params := context.Get(r, "params").(httprouter.Params)
 	did, err := strconv.Atoi(params.ByName("did"))
@@ -109,8 +113,6 @@ func (s *service) matchHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
 		return
 	}
-
-	w.WriteHeader(200)
 
 	sendResponse(w, result)
 }

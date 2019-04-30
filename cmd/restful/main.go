@@ -54,9 +54,15 @@ func main() {
 		s.authHandler,        // checking the auth
 		acceptHandler,        // accepts only requests types we want
 	)
-	optionsHandlers := alice.New(context.ClearHandler, s.loggingHandler)
+	optionsHandlers := alice.New(context.ClearHandler, s.loggingHandler, s.recoverHandler)
+	pingHandlers := alice.New(context.ClearHandler, s.recoverHandler)
 
 	router := newRouter()
+
+	// dump experts for one deployment - takes time
+	router.Get(
+		"/__ping",
+		pingHandlers.ThenFunc(s.pingHandler))
 
 	// dump experts for one deployment - takes time
 	router.Get(
