@@ -45,7 +45,11 @@ func (s *service) writeError(w http.ResponseWriter, err *Error, loggerMessage st
 		s.logger.Printf("Returning >>%d<< status code", err.Status)
 	}
 
-	msg := tgbotapi.NewMessageToChannel("-1001372830179", "Panic: "+fmt.Sprintf("Full error: %+v", err))
+	msg := tgbotapi.NewMessageToChannel("-1001372830179", fmt.Sprintf(`
+New message from: %s
+Front error: %+v
+Logger message: %s`, os.Getenv("COMPOSE_PROJECT_NAME"), err, loggerMessage))
+
 	s.telbot.Send(msg)
 
 	json.NewEncoder(w).Encode(Errors{[]*Error{err}})
