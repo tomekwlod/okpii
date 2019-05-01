@@ -5,8 +5,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/gorilla/context"
 	"github.com/justinas/alice"
 	"github.com/tomekwlod/okpii/models"
@@ -19,9 +21,11 @@ type service struct {
 	es     modelsES.Repository
 	mysql  modelsMysql.Repository
 	logger *log.Logger
+	telbot *tgbotapi.BotAPI
 }
 
 func main() {
+
 	// definig the logger & a log file
 	file, err := os.OpenFile("log/http.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -41,10 +45,21 @@ func main() {
 	}
 	defer mysqlClient.Close()
 
+	bot, err := tgbotapi.NewBotAPI(os.Getenv("BOT_TOKEN"))
+	if err != nil {
+		log.Fatalln("Failed to establish the Telegram connection")
+	}
+	botDebug, err := strconv.ParseBool(os.Getenv("BOT_DEBUG"))
+	if err != nil {
+		botDebug = false
+	}
+	bot.Debug = botDebug
+
 	s := &service{
 		es:     esClient,
 		mysql:  mysqlClient,
 		logger: l,
+		telbot: bot,
 	}
 
 	commonHandlers := alice.New(
@@ -83,16 +98,16 @@ func main() {
 	router.Post(
 		"/match",
 		commonHandlers.Append(
-			contentTypeHandler,
-			bodyHandler(models.Expert{}),
+			s.contentTypeHandler,
+			s.bodyHandler(models.Expert{}),
 		).ThenFunc(s.matchHandler))
 
 	// update expert's details
 	router.Put(
 		"/expert/:id",
 		commonHandlers.Append(
-			contentTypeHandler,
-			bodyHandler(models.Expert{}),
+			s.contentTypeHandler,
+			s.bodyHandler(models.Expert{}),
 		).ThenFunc(s.updateHandler))
 
 	// CORS support

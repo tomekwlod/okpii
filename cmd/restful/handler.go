@@ -17,7 +17,7 @@ func (s *service) expertsHandler(w http.ResponseWriter, r *http.Request) {
 	params := context.Get(r, "params").(httprouter.Params)
 	did, err := strconv.Atoi(params.ByName("did"))
 	if err != nil {
-		writeError(w, &Error{"wrong_parameter", 400, "Parameter provided couldn't be used", "One of the parameters is in wrong format."})
+		s.writeError(w, &Error{"wrong_parameter", 400, "Parameter provided couldn't be used", "One of the parameters is in wrong format."}, "")
 		return
 	}
 
@@ -37,7 +37,7 @@ func (s *service) dumpHandler(w http.ResponseWriter, r *http.Request) {
 	params := context.Get(r, "params").(httprouter.Params)
 	did, err := strconv.Atoi(params.ByName("did"))
 	if err != nil {
-		writeError(w, &Error{"wrong_parameter", 400, "Parameter provided couldn't be used", "One of the parameters is in wrong format."})
+		s.writeError(w, &Error{"wrong_parameter", 400, "Parameter provided couldn't be used", "One of the parameters is in wrong format."}, "")
 		return
 	}
 
@@ -48,7 +48,7 @@ func (s *service) dumpHandler(w http.ResponseWriter, r *http.Request) {
 		// getting the experts from the MySQL
 		lastID, experts, err = s.mysql.FetchExperts(lastID, did, 3000, nil)
 		if err != nil {
-			writeError(w, &Error{"data_error", 400, "Couldn't retrieve the data", err.Error()})
+			s.writeError(w, &Error{"data_error", 400, "Couldn't retrieve the data", err.Error()}, "")
 			return
 		}
 
@@ -63,7 +63,7 @@ func (s *service) dumpHandler(w http.ResponseWriter, r *http.Request) {
 		// indexing the experts onto ES
 		err = s.es.IndexExperts(experts, 3000)
 		if err != nil {
-			writeError(w, &Error{"index_error", 400, "Coudn't index the data", err.Error()})
+			s.writeError(w, &Error{"index_error", 400, "Coudn't index the data", err.Error()}, "")
 			return
 		}
 	}
@@ -84,14 +84,14 @@ func (s *service) matchHandler(w http.ResponseWriter, r *http.Request) {
 
 	// check the requirements
 	if exp.ID == 0 || exp.Ln == "" || exp.DID == 0 {
-		writeError(w, &Error{"wrong_parameter", 400, "Some required parameters coudn't be found", "Requirement: {id(int), ln(string), did(int)}"})
+		s.writeError(w, &Error{"wrong_parameter", 400, "Some required parameters coudn't be found", "Requirement: {id(int), ln(string), did(int)}"}, "")
 		return
 	}
 
 	// check if the base expert is really the one
 	k, err := s.es.FindOne(exp.ID, exp.DID, exp.Ln)
 	if err != nil {
-		writeError(w, &Error{"not_found", 400, "Expert (" + strconv.Itoa(exp.ID) + ") couldn't be found", "Synchronize the data"})
+		s.writeError(w, &Error{"not_found", 400, "Expert (" + strconv.Itoa(exp.ID) + ") couldn't be found", "Synchronize the data"}, "")
 		return
 	}
 
@@ -109,8 +109,7 @@ func (s *service) matchHandler(w http.ResponseWriter, r *http.Request) {
 	//   Xin    Li (909)		 <--- THIS IS ACTUALLY NOT TRUE, IT IS :    Xin-xia  Li <--> X X  Li
 	result, err = s.findMatches(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
 	if err != nil {
-		s.logger.Println("Error detected", err)
-		writeError(w, &Error{"Internal error", 404, "Error detected", err.Error()})
+		s.writeError(w, &Error{"Internal error", 404, "Error detected", err.Error()}, "")
 		return
 	}
 
@@ -128,8 +127,7 @@ func (s *service) updateHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := s.es.UpdatePartially(id, *body)
 	if err != nil {
-		s.logger.Println("Error detected", err)
-		writeError(w, &Error{"not_found", 404, "Error detected", err.Error()})
+		s.writeError(w, &Error{"not_found", 404, "Error detected", err.Error()}, "")
 	}
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -150,8 +148,7 @@ func (s *service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := s.es.MarkAsDeleted(id)
 	if err != nil {
-		s.logger.Println("Error detected", err)
-		writeError(w, &Error{"not_found", 404, "Error detected", err.Error()})
+		s.writeError(w, &Error{"not_found", 404, "Error detected", err.Error()}, "")
 	}
 
 	w.Header().Set("Access-Control-Allow-Origin", "*")

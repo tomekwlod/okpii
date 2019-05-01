@@ -10,6 +10,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/gorilla/context"
 )
 
@@ -32,9 +33,20 @@ type Error struct {
 	Detail string `json:"detail"`
 }
 
-func writeError(w http.ResponseWriter, err *Error) {
+func (s *service) writeError(w http.ResponseWriter, err *Error, loggerMessage string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(err.Status)
+
+	if loggerMessage == "" {
+		s.logger.Printf("Error received: %+v", err)
+		s.logger.Printf("Returning >>%d<< status code", err.Status)
+	} else {
+		s.logger.Print(loggerMessage)
+		s.logger.Printf("Returning >>%d<< status code", err.Status)
+	}
+
+	msg := tgbotapi.NewMessageToChannel("-1001372830179", "Panic: "+fmt.Sprintf("Full error: %+v", err))
+	s.telbot.Send(msg)
 
 	json.NewEncoder(w).Encode(Errors{[]*Error{err}})
 }
@@ -54,8 +66,17 @@ func (s *service) recoverHandler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				s.logger.Printf("panic: %+v", err)
-				writeError(w, errInternalServer)
+				s.writeError(w, errInternalServer, fmt.Sprintf("foo: %+v", err))
+
+				botEnabled, er := strconv.ParseBool(os.Getenv("BOT_ENABLED"))
+				if er != nil {
+					botEnabled = false
+				}
+				if botEnabled {
+					msg := tgbotapi.NewMessageToChannel(os.Getenv("BOT_CHANNEL"), "Panic: "+err.(string))
+					s.telbot.Send(msg)
+				}
+
 				return
 			}
 		}()
@@ -68,14 +89,15 @@ func (s *service) recoverHandler(next http.Handler) http.Handler {
 
 func (s *service) authHandler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
+
 		// https://medium.com/@adigunhammedolalekan/build-and-deploy-a-secure-rest-api-with-go-postgresql-jwt-and-gorm-6fadf3da505b
+		// https://tutorialedge.net/golang/authenticating-golang-rest-api-with-jwts/
 
 		// JWT_TOKEN has to be declared! It will be either used as an OpenToken if the JWT is disabled
 		//  or it will be used as a secret within the JWT mechanism
 		key := os.Getenv("JWT_TOKEN")
 		if key == "" {
-			s.logger.Print("No JWT Token detected in .env")
-			writeError(w, errInternalServer)
+			s.writeError(w, errInternalServer, "No JWT Token detected in .env")
 			return
 		}
 
@@ -91,13 +113,11 @@ func (s *service) authHandler(next http.Handler) http.Handler {
 				if r.Header.Get("OpenToken") == key {
 					next.ServeHTTP(w, r)
 				} else {
-					s.logger.Print("OpenToken key found but it doesn't match with the .env one")
-					writeError(w, errNotAuthorized)
+					s.writeError(w, errNotAuthorized, "OpenToken key found but it doesn't match with the .env one")
 					return
 				}
 			} else {
-				s.logger.Print("No OpenToken key found in header")
-				writeError(w, errNotAuthorized)
+				s.writeError(w, errNotAuthorized, "No OpenToken key found in header")
 				return
 			}
 
@@ -114,8 +134,10 @@ func (s *service) authHandler(next http.Handler) http.Handler {
 				})
 
 				if err != nil {
-					s.logger.Printf("JWT encryption error: %s", err.Error())
-					writeError(w, &Error{"authorization_error", 500, "Authorization error", "authorization error."})
+					s.writeError(
+						w,
+						&Error{"authorization_error", 500, "Authorization error", "authorization error."},
+						fmt.Sprintf("JWT encryption error: %s", err.Error()))
 				}
 
 				fmt.Println(token.Claims)
@@ -124,8 +146,7 @@ func (s *service) authHandler(next http.Handler) http.Handler {
 					next.ServeHTTP(w, r)
 				}
 			} else {
-				s.logger.Print("Not Authorized")
-				writeError(w, errNotAuthorized)
+				s.writeError(w, errNotAuthorized, "Not Authorized")
 				return
 			}
 		}
@@ -165,10 +186,10 @@ func acceptHandler(next http.Handler) http.Handler {
 
 // Content-Type header tells the server what the attached data actually is
 // Only for PUT & POST
-func contentTypeHandler(next http.Handler) http.Handler {
+func (s *service) contentTypeHandler(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Content-Type") != "application/json" {
-			writeError(w, errUnsupportedMediaType)
+			s.writeError(w, errUnsupportedMediaType, "")
 			return
 		}
 
@@ -178,7 +199,7 @@ func contentTypeHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
-func bodyHandler(v interface{}) func(http.Handler) http.Handler {
+func (s *service) bodyHandler(v interface{}) func(http.Handler) http.Handler {
 	t := reflect.TypeOf(v)
 
 	m := func(next http.Handler) http.Handler {
@@ -187,7 +208,7 @@ func bodyHandler(v interface{}) func(http.Handler) http.Handler {
 
 			err := json.NewDecoder(r.Body).Decode(val)
 			if err != nil {
-				writeError(w, errBadRequest)
+				s.writeError(w, errBadRequest, "")
 				return
 			}
 
