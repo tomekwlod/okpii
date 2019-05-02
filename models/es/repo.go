@@ -211,21 +211,21 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 		return nil
 	}
 
-	if searchResult.Hits.TotalHits > 2 {
-		fmt.Printf("\n\n\n!!!!!! (simple)  Too many (%d) results %s;\n\n\n", searchResult.Hits.TotalHits, name)
-		// fmt.Printf("[%s] %s %s %s\n", id, fn, mn, ln)
+	// if searchResult.Hits.TotalHits > 2 {
+	// 	fmt.Printf("\n\n\n!!!!!! (simple)  Too many (%d) results %s;\n\n\n", searchResult.Hits.TotalHits, name)
+	// 	// fmt.Printf("[%s] %s %s %s\n", id, fn, mn, ln)
 
-		// for _, hit := range searchResult.Hits.Hits {
-		// 	var row map[string]interface{}
+	// 	// for _, hit := range searchResult.Hits.Hits {
+	// 	// 	var row map[string]interface{}
 
-		// 	err := json.Unmarshal(*hit.Source, &row)
-		// 	if err != nil {
-		// 		panic(err)
-		// 	}
-		// 	// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
-		// }
-		return nil
-	}
+	// 	// 	err := json.Unmarshal(*hit.Source, &row)
+	// 	// 	if err != nil {
+	// 	// 		panic(err)
+	// 	// 	}
+	// 	// 	// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
+	// 	// }
+	// 	return nil
+	// }
 
 	for _, hit := range searchResult.Hits.Hits {
 		var row map[string]interface{}
@@ -309,18 +309,18 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 	}
 
 	if searchResult.Hits.TotalHits > 1 {
-		// fmt.Printf("  !!!!!! (short) Too many (%d) results %s;\n", searchResult.Hits.TotalHits, id)
+		fmt.Printf("  !!!!!! (short) Too many (%d) results %s;\n", searchResult.Hits.TotalHits, fmt.Sprintf("%s %s %s", fn, mn, ln))
 		// fmt.Printf("[%s] %s %s %s\n", id, fn, mn, ln)
 
-		for _, hit := range searchResult.Hits.Hits {
-			var row map[string]interface{}
+		// for _, hit := range searchResult.Hits.Hits {
+		// 	var row map[string]interface{}
 
-			err := json.Unmarshal(*hit.Source, &row)
-			if err != nil {
-				panic(err)
-			}
-			// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
-		}
+		// 	err := json.Unmarshal(*hit.Source, &row)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	}
+		// 	// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
+		// }
 		return nil
 	}
 

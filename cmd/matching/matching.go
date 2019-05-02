@@ -255,7 +255,14 @@ func names(m map[string]string) (fn, mn, ln string) {
 func (s *service) search(option int, custName, fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	switch option {
 	case 1:
-		return s.es.SimpleSearch(fn, mn, ln, country, city, did, exclIDs)
+		result = s.es.SimpleSearch(fn, mn, ln, country, city, did, exclIDs)
+
+		if len(result) > 2 {
+			// maybe not needed?
+			return nil
+		}
+
+		return result
 	case 2:
 		return s.es.ShortSearch(fn, mn, ln, country, city, did, exclIDs)
 	case 3:
