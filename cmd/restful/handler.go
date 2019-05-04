@@ -172,7 +172,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				row["type"] = "simple"
 				result[id] = row
 			}
-			return result, nil
+			break
 
 		case 2:
 			m := s.es.ShortSearch(fn, mn, ln, country, city, did, exclIDs)
@@ -181,7 +181,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				row["type"] = "short"
 				result[id] = row
 			}
-			return result, nil
+			break
 
 		case 3:
 			mn0 := s.es.NoMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
@@ -209,7 +209,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					s.logger.Println("There is more people with the same initials Fn% Ln")
 				}
 			}
-			return result, nil
+			break
 
 		case 4:
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
@@ -237,7 +237,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					s.logger.Println("There is more people with the same initials Fn *Mn* Ln")
 				}
 			}
-			return result, nil
+			break
 
 		case 5:
 			mn2 := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
@@ -265,7 +265,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					s.logger.Println("There is more people with the same initials Fn1% Ln")
 				}
 			}
-			return result, nil
+			break
 
 		case 6:
 			r := s.es.ThreeInitialsSearch(fn, mn, ln, country, city, did, exclIDs)
@@ -275,10 +275,14 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				row["type"] = "threein"
 				result[id] = row
 			}
-			return result, nil
+			break
 
 		default:
-			return nil, nil
+			break
+		}
+
+		if len(result) > 0 {
+			return result, nil
 		}
 	}
 
