@@ -215,7 +215,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 			if len(mn1) > 0 {
 				// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
-				q, err := s.es.BaseQuery(did, "", nil)
+				q, err := s.es.BaseQuery(did, "", exclIDs)
 				if err != nil {
 					return nil, err
 				}
