@@ -14,13 +14,14 @@ import (
 	"github.com/tomekwlod/okpii/models"
 	modelsES "github.com/tomekwlod/okpii/models/es"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
+	ml "github.com/tomekwlod/utils/logger"
 )
 
 // service struct to hold the db and the logger
 type service struct {
 	es     modelsES.Repository
 	mysql  modelsMysql.Repository
-	logger *log.Logger
+	logger *ml.Logger
 	telbot *tgbotapi.BotAPI
 }
 
@@ -32,7 +33,10 @@ func main() {
 		log.Fatalln("Failed to open log file", err)
 	}
 	multi := io.MultiWriter(file, os.Stdout)
-	l := log.New(multi, "", log.Ldate|log.Ltime|log.Lshortfile)
+	l := ml.New(
+		os.Getenv("LOGGING_MODE"),
+		log.New(multi, "", log.Ldate|log.Ltime|log.Lshortfile),
+	)
 
 	esClient, err := modelsES.ESClient()
 	if err != nil {
