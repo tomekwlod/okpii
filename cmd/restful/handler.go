@@ -41,6 +41,12 @@ func (s *service) dumpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_, err = s.es.RemoveData(did)
+	if err != nil {
+		s.writeError(w, &Error{"data_error", 400, "Couldn't delete the old data", err.Error()}, "")
+		return
+	}
+
 	var experts []*modelsMysql.Experts
 	lastID, total := 0, 0
 

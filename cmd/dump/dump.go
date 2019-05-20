@@ -50,7 +50,7 @@ type Experts struct {
 func main() {
 	didFlag := flag.String(
 		"did",
-		"1,2,3,9,10,11,12,13,14,15,16,17,22,24,25,26,27,28,29,30,31,32",
+		"1,2,3,9,10,11,12,13,14,15,16,17,22,24,25,26,27,28,29,30,31,32,33",
 		"A deployments list comma separated od a single deployment")
 	countriesFlag := flag.String(
 		"countries",
@@ -85,18 +85,18 @@ func main() {
 		mysql: mysqlClient,
 	}
 
-	fmt.Println("Removing old data")
-	deleted, err := s.es.RemoveData()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Removed %d rows\n\n", deleted)
-
-	fmt.Println("Querying for experts")
-
 	for _, did := range deployments {
 		did, _ := strconv.Atoi(did)
 		fmt.Printf("\nDeployment: %d\n\n", did)
+
+		fmt.Print("Removing old data...")
+		deleted, err := s.es.RemoveData(did)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf(" -> removed %d rows\n\n", deleted)
+
+		fmt.Println("Querying for experts")
 
 		var experts []*modelsMysql.Experts // needs to stay here. If we do below: `err,lastID,experts := s.fetchExperts(...)` it will override id all the time instead of reusing the declared one above
 

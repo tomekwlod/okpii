@@ -684,8 +684,8 @@ func (db *DB) FindOne(id, did int, ln string) (expert models.Expert, err error) 
 	return
 }
 
-func (db *DB) RemoveData() (deleted int64, err error) {
-	del, err := db.DeleteByQuery("experts").Query(elastic.NewMatchAllQuery()).Do(context.TODO())
+func (db *DB) RemoveData(did int) (deleted int64, err error) {
+	del, err := db.DeleteByQuery("experts").Query(elastic.NewMatchPhraseQuery("did", did)).Do(context.TODO())
 
 	// move below to a separate function
 	// deleteIndex, err := db.DeleteIndex("experts").Do(context.TODO())

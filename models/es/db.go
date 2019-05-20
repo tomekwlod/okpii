@@ -36,7 +36,7 @@ type Repository interface {
 	TestSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 
 	// index
-	RemoveData() (int64, error)
+	RemoveData(did int) (int64, error)
 	IndexExperts(experts []*modelsMysql.Experts, batchInsert int) error
 }
 
