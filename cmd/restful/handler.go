@@ -205,16 +205,22 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					return nil, err
 				}
 
-				if len(rows) == 1 {
+				if len(rows) > 1 {
+					ids := []int{}
 					for _, row := range rows {
-						id := int(row["id"].(float64))
-						row["type"] = "nomid"
-						result[id] = row
+						ids = append(ids, int(row["id"].(float64)))
 					}
-				} else {
-					s.logger.Println("There is more people with the same initials Fn% Ln")
+					s.logger.Printf("There are more people with the same initials Fn* Ln (%v)\n", ids)
+					break
+				}
+
+				for _, row := range rows {
+					id := int(row["id"].(float64))
+					row["type"] = "nomid"
+					result[id] = row
 				}
 			}
+
 			break
 
 		case 4:
@@ -233,14 +239,19 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					return nil, err
 				}
 
-				if len(rows) == 1 {
+				if len(rows) > 1 {
+					ids := []int{}
 					for _, row := range rows {
-						id := int(row["id"].(float64))
-						row["type"] = "onemid1"
-						result[id] = row
+						ids = append(ids, int(row["id"].(float64)))
 					}
-				} else {
-					s.logger.Println("There is more people with the same initials Fn *Mn* Ln")
+					s.logger.Printf("There are more people with the same initials Fn *Mn* Ln (%v)\n", ids)
+					break
+				}
+
+				for _, row := range rows {
+					id := int(row["id"].(float64))
+					row["type"] = "onemid1"
+					result[id] = row
 				}
 			}
 			break
@@ -261,14 +272,19 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					return nil, err
 				}
 
-				if len(rows) == 1 {
+				if len(rows) > 1 {
+					ids := []int{}
 					for _, row := range rows {
-						id := int(row["id"].(float64))
-						row["type"] = "onemid2"
-						result[id] = row
+						ids = append(ids, int(row["id"].(float64)))
 					}
-				} else {
-					s.logger.Println("There is more people with the same initials Fn1% Ln")
+					s.logger.Printf("There are more people with the same initials Fn1* Ln (%v)\n", ids)
+					break
+				}
+
+				for _, row := range rows {
+					id := int(row["id"].(float64))
+					row["type"] = "onemid2"
+					result[id] = row
 				}
 			}
 			break
