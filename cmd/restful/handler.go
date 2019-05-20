@@ -8,6 +8,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/tomekwlod/okpii/models"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
+	strutils "github.com/tomekwlod/utils/strings"
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
@@ -194,6 +195,27 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				break
 			}
 
+			q, err := s.es.BaseQuery(did, "", exclIDs)
+			if err != nil {
+				return nil, err
+			}
+
+			q.Must(elastic.NewMatchPhraseQuery("ln", ln))
+			q.Must(elastic.NewPrefixQuery("fn", strutils.FirstChar(fn)))
+			rows, err := s.es.ExecuteQuery(q)
+			if err != nil {
+				return nil, err
+			}
+
+			if len(rows) > 1 {
+				ids := []int{}
+				for _, row := range rows {
+					ids = append(ids, int(row["id"].(float64)))
+				}
+				s.logger.Printf("[NoMiddleNameSearch] There are more people like %s* %s (%v)\n", strutils.FirstChar(fn), ln, ids)
+				break
+			}
+
 			for _, hit := range mn0 {
 				id := int(hit["id"].(float64))
 				hit["type"] = "nomid"
@@ -206,7 +228,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 
 			if len(mn1) > 1 {
-				s.logger.Printf("[OneMiddleNameSearch] There are more people like %s * %s", fn, ln)
+				s.logger.Printf("[OneMiddleNameSearch] There are more people like %s* %s", strutils.FirstChar(fn), ln)
 				break
 			}
 
@@ -247,6 +269,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 
 		case 5:
 			mn2 := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
+
 			if len(mn2) > 0 {
 				// we have to check here how many other fn-X-ln we have, if more than one we cannot merge here
 				q, err := s.es.BaseQuery(did, "", exclIDs)

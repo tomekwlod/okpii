@@ -337,6 +337,18 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 }
 
 func (db *DB) NoMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	// this case is only for the names with NO MN on both sides!!
+	//
+	// EXPLANATION
+	//
+	// For a given Jorge  Cortes
+	// find all    J      Cortes
+	// or
+	// For a given J      Cortes
+	// find all    J*     Cortes
+
+	// WARNING! IMPORTANT! Check the quantity of the results later!!
+
 	if mn != "" {
 		// this case is only for the names with NO MN included
 
@@ -375,12 +387,10 @@ func (db *DB) NoMiddleNameSearch(fn, mn, ln, country, city string, did int, excl
 	}
 
 	if searchResult.Hits.TotalHits == 0 {
-		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
 		return nil
 	}
 
 	if searchResult.Hits.TotalHits > 1 {
-		fmt.Printf("====> Too many results! Should be only one like: %s %s\n", strutils.FirstChar(fn), ln)
 		return nil
 	}
 
