@@ -8,7 +8,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/tomekwlod/okpii/models"
 	modelsMysql "github.com/tomekwlod/okpii/models/mysql"
-	strutils "github.com/tomekwlod/utils/strings"
 	elastic "gopkg.in/olivere/elastic.v6"
 )
 
@@ -191,34 +190,14 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 
 		case 3:
 			mn0 := s.es.NoMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
-			if len(mn0) > 0 {
-				// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
-				q, err := s.es.BaseQuery(did, "", exclIDs)
-				if err != nil {
-					return nil, err
-				}
+			if len(mn0) > 1 || len(mn0) == 0 {
+				break
+			}
 
-				q.Must(elastic.NewMatchPhraseQuery("ln", ln))
-				q.Must(elastic.NewPrefixQuery("fn", strutils.FirstChar(fn)))
-				rows, err := s.es.ExecuteQuery(q)
-				if err != nil {
-					return nil, err
-				}
-
-				if len(rows) > 1 {
-					ids := []int{}
-					for _, row := range rows {
-						ids = append(ids, int(row["id"].(float64)))
-					}
-					s.logger.Printf("There are more people with the same initials Fn* Ln (%v)\n", ids)
-					break
-				}
-
-				for _, row := range rows {
-					id := int(row["id"].(float64))
-					row["type"] = "nomid"
-					result[id] = row
-				}
+			for _, hit := range mn0 {
+				id := int(hit["id"].(float64))
+				hit["type"] = "nomid"
+				result[id] = hit
 			}
 
 			break
@@ -227,7 +206,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 
 			if len(mn1) > 1 {
-				s.logger.Printf("There are more people like %s * %s", fn, ln)
+				s.logger.Printf("[OneMiddleNameSearch] There are more people like %s * %s", fn, ln)
 				break
 			}
 
@@ -253,16 +232,17 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					for _, row := range rows {
 						ids = append(ids, int(row["id"].(float64)))
 					}
-					s.logger.Printf("There are more people with the same initials Fn *Mn* Ln (%v)\n", ids)
+					s.logger.Printf("[OneMiddleNameSearch] There are more people with the same initials Fn *Mn* Ln (%v)\n", ids)
 					break
 				}
-
-				for _, row := range rows {
-					id := int(row["id"].(float64))
-					row["type"] = "onemid1"
-					result[id] = row
-				}
 			}
+
+			for _, hit := range mn1 {
+				id := int(hit["id"].(float64))
+				hit["type"] = "onemid1"
+				result[id] = hit
+			}
+
 			break
 
 		case 5:
@@ -285,21 +265,22 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					return nil, err
 				}
 
-				if len(rows) > 1 {
+				if len(rows) > 0 {
 					ids := []int{}
 					for _, row := range rows {
 						ids = append(ids, int(row["id"].(float64)))
 					}
-					s.logger.Printf("There are more people like %s %s* %s (%v)\n", fn, mn, ln, ids)
+					s.logger.Printf("There are more people like %s * %s (%v)\n", fn, ln, ids)
 					break
 				}
-
-				for _, row := range rows {
-					id := int(row["id"].(float64))
-					row["type"] = "onemid2"
-					result[id] = row
-				}
 			}
+
+			for _, hit := range mn2 {
+				id := int(hit["id"].(float64))
+				hit["type"] = "onemid2"
+				result[id] = hit
+			}
+
 			break
 
 		case 6:

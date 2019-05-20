@@ -298,10 +298,7 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 	if err != nil {
 		panic(err)
 	}
-	///////////////
-	fmt.Println("res", searchResult.Hits.TotalHits)
-	PrintESQuery(nss)
-	///////////////
+
 	if searchResult.Hits.TotalHits == 0 {
 		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
 		return nil
