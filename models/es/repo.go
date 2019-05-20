@@ -256,10 +256,6 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 
 	// adding LN to a query
 	q = lastNameQuery(q, ln)
-	// q.Should(
-	// 	elastic.NewMatchPhraseQuery("ln", ln),
-	// 	elastic.NewMatchPhraseQuery("ln.german", ln),
-	// ).MinimumShouldMatch("1")
 
 	fn = strings.Replace(fn, ".", "", -1)
 	mn = strings.Replace(mn, ".", "", -1)
@@ -297,7 +293,9 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 	q.Must(mn1q, fn1q)
 
 	nss := elastic.NewSearchSource().Query(q)
-
+	///////////////
+	PrintESQuery(nss)
+	///////////////
 	searchResult, err := db.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
 	if err != nil {
 		panic(err)
@@ -403,9 +401,16 @@ func (db *DB) NoMiddleNameSearch(fn, mn, ln, country, city string, did int, excl
 }
 
 func (db *DB) OneMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
-	if mn != "" {
-		// this case is only for the names with NO MN included
+	// this case is only for the names with NO MN incomming
+	//
+	// EXPLANATION
+	//
+	// For a given Jorge    Cortes
+	// find all    Jorge X* Cortes  names
+	//
+	// WARNING! Check later if there is more than one result here
 
+	if mn != "" {
 		// ---------------------------
 		// ->Ralf    Dittrich {OSNABRÜCK}             ====> Found [did:1]: 5711743
 		// 0.Ralf F. Dittrich {}
@@ -421,6 +426,7 @@ func (db *DB) OneMiddleNameSearch(fn, mn, ln, country, city string, did int, exc
 
 	// adding LN to a query
 	q = lastNameQuery(q, ln)
+	q.MustNot(elastic.NewTermQuery("mn", ""))
 
 	fnq := elastic.NewBoolQuery().Should(
 		elastic.NewMatchPhraseQuery("aliases", fn),
@@ -437,14 +443,8 @@ func (db *DB) OneMiddleNameSearch(fn, mn, ln, country, city string, did int, exc
 	}
 
 	if searchResult.Hits.TotalHits == 0 {
-		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
 		return nil
 	}
-
-	// if searchResult.Hits.TotalHits > 1 {
-	// 	// fmt.Printf("[%s] \t\t ====> Too many results! (oneMiddleNameOnly1) %s %s\n", id, fn, ln)
-	// 	// return nil
-	// }
 
 	for _, hit := range searchResult.Hits.Hits {
 		var row map[string]interface{}
@@ -461,9 +461,17 @@ func (db *DB) OneMiddleNameSearch(fn, mn, ln, country, city string, did int, exc
 }
 
 func (db *DB) OneMiddleNameSearch2(fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
-	if mn == "" {
-		// this case is only for the names WITH MN included
 
+	// this case is only for the names WITH MN included
+	//
+	// EXPLANATION
+	//
+	// For a given  Jorge E Cortes
+	// find all     Jorge   Cortes  names only
+	//
+	// WARNING! Check later if we have no Jorge !E Cortes
+
+	if mn == "" {
 		// ---------------------------
 		// ->Ralf F. Dittrich {OSNABRÜCK}             ====> Found [did:1]: 5711743
 		// 0.Ralf    Dittrich {}
@@ -500,11 +508,6 @@ func (db *DB) OneMiddleNameSearch2(fn, mn, ln, country, city string, did int, ex
 
 	if searchResult.Hits.TotalHits == 0 {
 		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
-		return nil
-	}
-
-	if searchResult.Hits.TotalHits > 1 {
-		// fmt.Printf("[%s] \t\t ====> Too many results! (oneMiddleNameOnly2) %s %s\n", id, fn, ln)
 		return nil
 	}
 

@@ -225,6 +225,12 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 
 		case 4:
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			if len(mn1) > 1 {
+				s.logger.Printf("There are more people like %s * %s", fn, ln)
+				break
+			}
+
 			if len(mn1) > 0 {
 				// we have to check here how many other fn-mn-ln we have, if more than one we cannot merge here
 				q, err := s.es.BaseQuery(did, "", exclIDs)
@@ -232,8 +238,11 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					return nil, err
 				}
 
-				q.Must(elastic.NewMatchPhraseQuery("ln", ln))
-				q.Must(elastic.NewMatchPhraseQuery("fn", fn))
+				q.Filter(
+					elastic.NewMatchPhraseQuery("ln", ln),
+					elastic.NewMatchPhraseQuery("fn", fn),
+				)
+
 				rows, err := s.es.ExecuteQuery(q)
 				if err != nil {
 					return nil, err
@@ -259,14 +268,18 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 		case 5:
 			mn2 := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
 			if len(mn2) > 0 {
-				// we have to check here how many other fn-ln we have, if more than one we cannot merge here
+				// we have to check here how many other fn-X-ln we have, if more than one we cannot merge here
 				q, err := s.es.BaseQuery(did, "", exclIDs)
 				if err != nil {
 					return nil, err
 				}
 
-				q.Must(elastic.NewMatchPhraseQuery("ln", ln))
-				q.Must(elastic.NewMatchPhraseQuery("fn", fn))
+				q.Filter(
+					elastic.NewMatchPhraseQuery("ln", ln),
+					elastic.NewMatchPhraseQuery("fn", fn),
+					elastic.NewBoolQuery().MustNot(elastic.NewTermQuery("mn", "")),
+				)
+
 				rows, err := s.es.ExecuteQuery(q)
 				if err != nil {
 					return nil, err
@@ -277,7 +290,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					for _, row := range rows {
 						ids = append(ids, int(row["id"].(float64)))
 					}
-					s.logger.Printf("There are more people with the same initials Fn1* Ln (%v)\n", ids)
+					s.logger.Printf("There are more people like %s %s* %s (%v)\n", fn, mn, ln, ids)
 					break
 				}
 
