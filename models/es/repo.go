@@ -265,6 +265,9 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 
 	if fnl <= 1 && mnl <= 1 {
 		// nothing to do if short names already; squash would do the job
+		// J E Cortes
+		// or
+		// J Cortes
 		return nil
 	}
 

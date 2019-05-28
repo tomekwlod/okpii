@@ -293,7 +293,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 					for _, row := range rows {
 						ids = append(ids, int(row["id"].(float64)))
 					}
-					s.logger.Printf("There are more people like %s * %s (%v)\n", fn, ln, ids)
+					s.logger.Printf("[OneMiddleNameSearch2] There are more people like %s * %s (%v)\n", fn, ln, ids)
 					break
 				}
 			}
