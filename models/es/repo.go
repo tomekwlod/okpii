@@ -281,7 +281,7 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 		// First Middle Last
 		// First Maybe  Last
 		// both would match, so either we check against the Mongodb or for now ignore it (maybe also location check?)
-		mn1q.Should(elastic.NewMatchPhrasePrefixQuery("mn", mn))
+		mn1q.Should(elastic.NewPrefixQuery("mn", mn))
 	}
 	mn1q.MinimumShouldMatch("1")
 
@@ -296,7 +296,7 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 	q.Must(mn1q, fn1q)
 
 	nss := elastic.NewSearchSource().Query(q)
-
+	PrintESQuery(nss)
 	searchResult, err := db.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
 	if err != nil {
 		panic(err)
