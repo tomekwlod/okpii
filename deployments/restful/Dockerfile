@@ -14,6 +14,7 @@ RUN go get -u github.com/golang/dep/cmd/dep \
 FROM alpine:3.8
 
 RUN apk --no-cache add ca-certificates
+ENV STATICPATH=static
 WORKDIR /root/
 COPY --from=builder /go/src/app/cmd/restful/restful .
 
