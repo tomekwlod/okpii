@@ -296,7 +296,7 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 	q.Must(mn1q, fn1q)
 
 	nss := elastic.NewSearchSource().Query(q)
-	PrintESQuery(nss)
+
 	searchResult, err := db.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
 	if err != nil {
 		panic(err)
