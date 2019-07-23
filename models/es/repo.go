@@ -164,6 +164,9 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	// 	return nil
 	// }
 
+	// John Mark Smith || Brian Surni <- with ASCII-folding
+	q.Should(elastic.NewTermQuery("nameKeyword", name))
+
 	// nameKeyword is case sensitive
 	// nameKeywordSquash,nameKeywordRaw is NOT case sensitive
 	if strutils.Length(ln) > 3 {
@@ -172,16 +175,12 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 		// JohnMarkSmith || BrianSurni    <- with ASCII-folding & lowercase
 		q.Should(elastic.NewTermQuery("nameKeywordRaw", nameRaw))
 
+		// only if the given name is with nonASCII we should add the german(and other) languages support
+		// if !strutils.IsASCII(name) {
+		// @todo: test how many less results we have!
+		q.Should(elastic.NewTermQuery("nameKeyword.german", name))
+		// }
 	}
-
-	// John Mark Smith || Brian Surni <- with ASCII-folding
-	q.Should(elastic.NewTermQuery("nameKeyword", name))
-
-	// only if the given name is with nonASCII we should add the german(and other) languages support
-	// if !strutils.IsASCII(name) {
-	// @todo: test how many less results we have!
-	q.Should(elastic.NewTermQuery("nameKeyword.german", name))
-	// }
 
 	if name1 != name {
 		// John M Smith <- with ASCII-folding
