@@ -158,12 +158,15 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	// 	// or
 	// 	// S  Yan
 	// 	// S Y An
+	//  // or
+	//	// Peng  Xu
+	//	// Peng  Xue
 	// 	return nil
 	// }
 
 	// nameKeyword is case sensitive
 	// nameKeywordSquash,nameKeywordRaw is NOT case sensitive
-	if len(nameRaw) > 4 {
+	if strutils.Length(ln) > 3 {
 		// JohnMarkSmith || BrianSurni    <- with ASCII-folding
 		q.Should(elastic.NewTermQuery("nameKeywordSquash", nameRaw))
 		// JohnMarkSmith || BrianSurni    <- with ASCII-folding & lowercase
@@ -184,7 +187,7 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 		// John M Smith <- with ASCII-folding
 		q.Should(elastic.NewTermQuery("nameKeyword", name1))
 
-		if len(nameRaw) > 4 {
+		if strutils.Length(ln) > 3 {
 			// JohnMSmith   <- with ASCII-folding
 			nameRaw = strings.Replace(strings.Replace(name1, " ", "", -1), "-", "", -1)
 			q.Should(elastic.NewTermQuery("nameKeywordSquash", nameRaw))
