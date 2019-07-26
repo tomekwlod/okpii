@@ -28,6 +28,7 @@ type Repository interface {
 	// searches
 	BaseQuery(did int, country string, exclIDs []string) (*elastic.BoolQuery, error)
 	SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
+	ForeignSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 	ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 	NoMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}
 	OneMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{}

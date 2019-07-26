@@ -138,8 +138,6 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 		return nil
 	}
 
-	// rln := strutils.LastWord(ln)
-
 	mnstr := " "
 	mn1 := ""
 	if mn != "" {
@@ -151,19 +149,6 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	nameRaw := strings.Replace(strings.Replace(name, " ", "", -1), "-", "", -1)
 	name1 := fn + mn1 + ln
 
-	// if len(nameRaw) <= 4 {
-	// 	// to avoid very weak merging and to temporary eliminate:
-	// 	// Ma  Li
-	// 	// M  Ali
-	// 	// or
-	// 	// S  Yan
-	// 	// S Y An
-	//  // or
-	//	// Peng  Xu
-	//	// Peng  Xue
-	// 	return nil
-	// }
-
 	// John Mark Smith || Brian Surni <- with ASCII-folding
 	q.Should(elastic.NewTermQuery("nameKeyword", name))
 
@@ -174,12 +159,6 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 		q.Should(elastic.NewTermQuery("nameKeywordSquash", nameRaw))
 		// JohnMarkSmith || BrianSurni    <- with ASCII-folding & lowercase
 		q.Should(elastic.NewTermQuery("nameKeywordRaw", nameRaw))
-
-		// only if the given name is with nonASCII we should add the german(and other) languages support
-		// if !strutils.IsASCII(name) {
-		// @todo: test how many less results we have!
-		q.Should(elastic.NewTermQuery("nameKeyword.german", name))
-		// }
 	}
 
 	if name1 != name {
@@ -195,19 +174,6 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 
 	q.MinimumShouldMatch("1")
 
-	// disabled because we would not match a lot of good examples, eg:
-	//  Joaquín Pastor Fernández
-	//  Joaquín Pastor Ferná Ndez
-	// ... needs more thinking
-	//
-	// // this is to avoid matching:
-	// //  Ma  Li
-	// //  M  Ali
-	// // or
-	// //  S  Yan
-	// //  S Y An
-	// q.Must(elastic.NewMatchPhraseQuery("name", rln))
-
 	// this is the best if we want to print the query for the test purposes
 	nss := elastic.NewSearchSource().Query(q)
 
@@ -217,25 +183,8 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	}
 
 	if searchResult.Hits.TotalHits == 0 {
-		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
 		return nil
 	}
-
-	// if searchResult.Hits.TotalHits > 2 {
-	// 	fmt.Printf("\n\n\n!!!!!! (simple)  Too many (%d) results %s;\n\n\n", searchResult.Hits.TotalHits, name)
-	// 	// fmt.Printf("[%s] %s %s %s\n", id, fn, mn, ln)
-
-	// 	// for _, hit := range searchResult.Hits.Hits {
-	// 	// 	var row map[string]interface{}
-
-	// 	// 	err := json.Unmarshal(*hit.Source, &row)
-	// 	// 	if err != nil {
-	// 	// 		panic(err)
-	// 	// 	}
-	// 	// 	// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
-	// 	// }
-	// 	return nil
-	// }
 
 	for _, hit := range searchResult.Hits.Hits {
 		var row map[string]interface{}
@@ -246,8 +195,50 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 		}
 
 		result = append(result, row)
+	}
 
-		// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
+	return result
+}
+
+func (db *DB) ForeignSearch(fn, mn, ln, country, city string, did int, exclIDs []string) []map[string]interface{} {
+	result := []map[string]interface{}{}
+
+	q, err := baseQuery(did, country, exclIDs)
+	if err != nil {
+		return nil
+	}
+
+	mnstr := " "
+	if mn != "" {
+		mnstr = " " + mn + " "
+	}
+
+	name := fn + mnstr + ln
+
+	q.Should(elastic.NewTermQuery("nameKeyword.german", name))
+	q.MinimumShouldMatch("1")
+
+	// this is the best if we want to print the query for the test purposes
+	nss := elastic.NewSearchSource().Query(q)
+
+	searchResult, err := db.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	if searchResult.Hits.TotalHits == 0 {
+		return nil
+	}
+
+	for _, hit := range searchResult.Hits.Hits {
+		var row map[string]interface{}
+
+		err := json.Unmarshal(*hit.Source, &row)
+		if err != nil {
+			panic(err)
+		}
+
+		result = append(result, row)
 	}
 
 	return result
@@ -314,22 +305,6 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 
 	if searchResult.Hits.TotalHits == 0 {
 		// fmt.Printf("[%s] %s %s %s \t\t ====> Not found\n", id, fn, mn, ln)
-		return nil
-	}
-
-	if searchResult.Hits.TotalHits > 1 {
-		fmt.Printf("  !!!!!! (short) Too many (%d) results %s;\n", searchResult.Hits.TotalHits, fmt.Sprintf("%s %s %s", fn, mn, ln))
-		// fmt.Printf("[%s] %s %s %s\n", id, fn, mn, ln)
-
-		// for _, hit := range searchResult.Hits.Hits {
-		// 	var row map[string]interface{}
-
-		// 	err := json.Unmarshal(*hit.Source, &row)
-		// 	if err != nil {
-		// 		panic(err)
-		// 	}
-		// 	// fmt.Printf(" > [%s] %s %s %s\n", hit.Id, row["fn"], row["mn"], row["ln"])
-		// }
 		return nil
 	}
 

@@ -168,7 +168,7 @@ func (s *service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs []string) (map[int]interface{}, error) {
 	result := map[int]interface{}{}
 
-	for i := 1; i <= 5; i++ {
+	for i := 1; i <= 6; i++ {
 		switch i {
 
 		case 1:
@@ -179,9 +179,48 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				result[id] = row
 			}
 			break
-
 		case 2:
+			m := s.es.ForeignSearch(fn, mn, ln, country, city, did, exclIDs)
+			for _, row := range m {
+				id := int(row["id"].(float64))
+				row["type"] = "foreign"
+				result[id] = row
+			}
+			break
+
+		case 3:
 			m := s.es.ShortSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			if len(m) > 0 {
+
+				// moreExcl := []string{}
+				for _, row := range m {
+					exclIDs = append(exclIDs, strconv.FormatFloat(row["id"].(float64), 'g', 1, 64))
+				}
+
+				q, err := s.es.BaseQuery(did, "", exclIDs)
+				if err != nil {
+					return nil, err
+				}
+
+				q.Must(elastic.NewMatchPhraseQuery("ln", ln))
+				q.Must(elastic.NewPrefixQuery("fn", strutils.FirstChar(fn)))
+				q.Must(elastic.NewPrefixQuery("mn", strutils.FirstChar(mn)))
+				rows, err := s.es.ExecuteQuery(q)
+				if err != nil {
+					return nil, err
+				}
+
+				if len(rows) > 1 {
+					ids := []int{}
+					for _, row := range rows {
+						ids = append(ids, int(row["id"].(float64)))
+					}
+					s.logger.Printf("[ShortSearch] There are more people like %s* %s* %s (%v)\n", strutils.FirstChar(fn), strutils.FirstChar(mn), ln, ids)
+					break
+				}
+			}
+
 			for _, row := range m {
 				id := int(row["id"].(float64))
 				row["type"] = "short"
@@ -189,7 +228,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 			}
 			break
 
-		case 3:
+		case 4:
 			mn0 := s.es.NoMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 			if len(mn0) > 1 || len(mn0) == 0 {
 				break
@@ -224,7 +263,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 
 			break
 
-		case 4:
+		case 5:
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 
 			if len(mn1) > 1 {
@@ -267,7 +306,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 
 			break
 
-		case 5:
+		case 6:
 			mn2 := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
 
 			if len(mn2) > 0 {
@@ -306,7 +345,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 
 			break
 
-		case 6:
+		case 7:
 			r := s.es.ThreeInitialsSearch(fn, mn, ln, country, city, did, exclIDs)
 
 			for _, row := range r {
