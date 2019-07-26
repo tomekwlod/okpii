@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/context"
 	"github.com/julienschmidt/httprouter"
@@ -181,11 +182,42 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 			break
 		case 2:
 			m := s.es.ForeignSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			if len(m) == 0 {
+				break
+			}
+
+			names := []string{}
+			names = append(names, fn+" "+mn+" "+ln)
+
+			isASCII := true
+
+			if !strutils.IsASCII(fn + mn + ln) {
+				isASCII = false
+			}
+
 			for _, row := range m {
 				id := int(row["id"].(float64))
+				name := row["fn"].(string) + row["mn"].(string) + row["ln"].(string)
+
+				names = append(names, name)
+
 				row["type"] = "foreign"
 				result[id] = row
+
+				if !strutils.IsASCII(name) {
+					isASCII = false
+				}
 			}
+
+			if isASCII {
+				// it is just ASCII - no German or other country scpecifics
+				// in this case we dont want to continue
+				result = map[int]interface{}{}
+
+				s.logger.Printf("[ForeignSearch] BLOCKED because it is not ASCII name %s \n", strings.Join(names, " ;; "))
+			}
+
 			break
 
 		case 3:
