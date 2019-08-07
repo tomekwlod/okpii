@@ -139,6 +139,7 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	result := []map[string]interface{}{}
 
 	q, err := baseQuery(did, country, exclIDs)
+
 	if err != nil {
 		return nil
 	}
