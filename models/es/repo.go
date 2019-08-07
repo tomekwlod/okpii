@@ -60,9 +60,14 @@ var countryCodes = map[string]string{
 }
 
 func baseQuery(did int, country string, exclIDs []string) (*elastic.BoolQuery, error) {
-	q := elastic.NewBoolQuery().Filter(
-		elastic.NewMatchPhraseQuery("did", did),
-	)
+
+	q := elastic.NewBoolQuery()
+
+	if did != 0 {
+		q.Filter(
+			elastic.NewMatchPhraseQuery("did", did),
+		)
+	}
 
 	if country != "" {
 		if val, ok := countryCodes[country]; ok {

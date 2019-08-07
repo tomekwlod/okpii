@@ -90,8 +90,8 @@ func (s *service) matchHandler(w http.ResponseWriter, r *http.Request) {
 	result := map[int]interface{}{}
 
 	// check the requirements
-	if exp.ID == 0 || exp.Ln == "" || exp.DID == 0 {
-		s.writeError(w, &Error{"wrong_parameter", 400, "Some required parameters coudn't be found", "Requirement: {id(int), ln(string), did(int)}"}, "")
+	if exp.ID == 0 || exp.Ln == "" {
+		s.writeError(w, &Error{"wrong_parameter", 400, "Some required parameters coudn't be found", "Requirement: {id(int), ln(string)}"}, "")
 		return
 	}
 
