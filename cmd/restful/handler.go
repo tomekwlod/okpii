@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -169,26 +170,26 @@ func (s *service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs []string) (map[int]interface{}, error) {
 	result := map[int]interface{}{}
 
-	for i := 1; i <= 6; i++ {
+	for i := 1; i <= 7; i++ {
 		switch i {
 
 		case 1:
 			m := s.es.SimpleSearch(fn, mn, ln, country, city, did, exclIDs)
 
-			// fmt.Printf("%d: %d\n", i, len(m))
+			fmt.Printf("%d: %d\n", i, len(m))
 
 			for _, row := range m {
 				id := int(row["id"].(float64))
 				row["type"] = "simple"
 				result[id] = row
 
-				exclIDs = append(exclIDs, strconv.Itoa(id))
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 			break
 		case 2:
 			m := s.es.ForeignSearch(fn, mn, ln, country, city, did, exclIDs)
 
-			// fmt.Printf("%d: %d\n", i, len(m))
+			fmt.Printf("%d: %d\n", i, len(m))
 
 			if len(m) == 0 {
 				break
@@ -227,7 +228,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				row["type"] = "foreign"
 				result[id] = row
 
-				exclIDs = append(exclIDs, strconv.Itoa(id))
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 
 			break
@@ -235,7 +236,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 		case 3:
 			m := s.es.ShortSearch(fn, mn, ln, country, city, did, exclIDs)
 
-			// fmt.Printf("%d: %d\n", i, len(m))
+			fmt.Printf("%d: %d\n", i, len(m))
 
 			if len(m) > 0 {
 
@@ -270,7 +271,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				id := int(row["id"].(float64))
 				row["type"] = "short"
 
-				exclIDs = append(exclIDs, strconv.Itoa(id))
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 
 				result[id] = row
 			}
@@ -279,7 +280,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 		case 4:
 			mn0 := s.es.NoMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 
-			// fmt.Printf("%d: %d\n", i, len(mn0))
+			fmt.Printf("%d: %d\n", i, len(mn0))
 
 			if len(mn0) > 1 || len(mn0) == 0 {
 				break
@@ -311,7 +312,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				hit["type"] = "nomid"
 				result[id] = hit
 
-				exclIDs = append(exclIDs, strconv.Itoa(id))
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 
 			break
@@ -319,7 +320,7 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 		case 5:
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
 
-			// fmt.Printf("%d: %d\n", i, len(mn1))
+			fmt.Printf("%d: %d\n", i, len(mn1))
 
 			if len(mn1) > 1 {
 				s.logger.Printf("[OneMiddleNameSearch] There are more people like %s* %s", strutils.FirstChar(fn), ln)
@@ -358,13 +359,15 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				hit["type"] = "onemid1"
 				result[id] = hit
 
-				exclIDs = append(exclIDs, strconv.Itoa(id))
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 
 			break
 
 		case 6:
 			mn2 := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(mn2))
 
 			if len(mn2) > 0 {
 				// we have to check here how many other fn-X-ln we have, if more than one we cannot merge here
@@ -399,22 +402,36 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				hit["type"] = "onemid2"
 				result[id] = hit
 
-				exclIDs = append(exclIDs, strconv.Itoa(id))
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 
 			break
 
 		case 7:
+			m := s.es.MadnessSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(m))
+
+			for _, row := range m {
+				id := int(row["id"].(float64))
+				row["type"] = "madness"
+				result[id] = row
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
+			}
+			break
+
+		case 8:
 			r := s.es.ThreeInitialsSearch(fn, mn, ln, country, city, did, exclIDs)
 
-			// fmt.Printf("%d: %d\n", i, len(r))
+			fmt.Printf("%d: %d\n", i, len(r))
 
 			for _, row := range r {
 				id := int(row["id"].(float64))
 				row["type"] = "threein"
 				result[id] = row
 
-				exclIDs = append(exclIDs, strconv.Itoa(id))
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 			break
 
@@ -425,11 +442,11 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 		// fmt.Println("> ", len(result))
 	}
 
-	// fmt.Println(">> ", len(result))
-
 	if len(result) > 0 {
 		return result, nil
 	}
+
+	// fmt.Println(">> ", len(result))
 
 	return nil, nil
 }
