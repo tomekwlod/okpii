@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -114,7 +115,7 @@ func (s *service) matchHandler(w http.ResponseWriter, r *http.Request) {
 	// and:
 	//   X   X  Li (3243)        <------- removed
 	//   Xin    Li (909)		 <--- THIS IS ACTUALLY NOT TRUE, IT IS :    Xin-xia  Li <--> X X  Li
-	result, err = s.findMatches(k.Fn, k.Mn, k.Ln, "", "", k.DID, exclIDs)
+	result, err = s.findMatches(k.Fn, k.Mn, k.Ln, "", "", exp.DID, exclIDs)
 	if err != nil {
 		s.writeError(w, &Error{"Internal error", 404, "Error detected", err.Error()}, "")
 		return
@@ -169,19 +170,26 @@ func (s *service) deleteHandler(w http.ResponseWriter, r *http.Request) {
 func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs []string) (map[int]interface{}, error) {
 	result := map[int]interface{}{}
 
-	for i := 1; i <= 6; i++ {
+	for i := 1; i <= 7; i++ {
 		switch i {
 
 		case 1:
 			m := s.es.SimpleSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(m))
+
 			for _, row := range m {
 				id := int(row["id"].(float64))
 				row["type"] = "simple"
 				result[id] = row
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 			break
 		case 2:
 			m := s.es.ForeignSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(m))
 
 			if len(m) == 0 {
 				break
@@ -197,13 +205,8 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 			}
 
 			for _, row := range m {
-				id := int(row["id"].(float64))
 				name := row["fn"].(string) + row["mn"].(string) + row["ln"].(string)
-
 				names = append(names, name)
-
-				row["type"] = "foreign"
-				result[id] = row
 
 				if !strutils.IsASCII(name) {
 					isASCII = false
@@ -212,10 +215,20 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 
 			if isASCII {
 				// it is just ASCII - no German or other country scpecifics
-				// in this case we dont want to continue
-				result = map[int]interface{}{}
+				// in this case we don't want to continue
 
 				s.logger.Printf("[ForeignSearch] BLOCKED because it is not ASCII name %s \n", strings.Join(names, " ;; "))
+
+				break
+			}
+
+			for _, row := range m {
+				id := int(row["id"].(float64))
+
+				row["type"] = "foreign"
+				result[id] = row
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 
 			break
@@ -223,9 +236,10 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 		case 3:
 			m := s.es.ShortSearch(fn, mn, ln, country, city, did, exclIDs)
 
+			fmt.Printf("%d: %d\n", i, len(m))
+
 			if len(m) > 0 {
 
-				// moreExcl := []string{}
 				for _, row := range m {
 					exclIDs = append(exclIDs, strconv.FormatFloat(row["id"].(float64), 'g', 1, 64))
 				}
@@ -256,12 +270,18 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 			for _, row := range m {
 				id := int(row["id"].(float64))
 				row["type"] = "short"
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
+
 				result[id] = row
 			}
 			break
 
 		case 4:
 			mn0 := s.es.NoMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(mn0))
+
 			if len(mn0) > 1 || len(mn0) == 0 {
 				break
 			}
@@ -291,12 +311,16 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				id := int(hit["id"].(float64))
 				hit["type"] = "nomid"
 				result[id] = hit
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 
 			break
 
 		case 5:
 			mn1 := s.es.OneMiddleNameSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(mn1))
 
 			if len(mn1) > 1 {
 				s.logger.Printf("[OneMiddleNameSearch] There are more people like %s* %s", strutils.FirstChar(fn), ln)
@@ -334,12 +358,16 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				id := int(hit["id"].(float64))
 				hit["type"] = "onemid1"
 				result[id] = hit
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 
 			break
 
 		case 6:
 			mn2 := s.es.OneMiddleNameSearch2(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(mn2))
 
 			if len(mn2) > 0 {
 				// we have to check here how many other fn-X-ln we have, if more than one we cannot merge here
@@ -373,17 +401,37 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 				id := int(hit["id"].(float64))
 				hit["type"] = "onemid2"
 				result[id] = hit
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 
 			break
 
 		case 7:
+			m := s.es.MadnessSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(m))
+
+			for _, row := range m {
+				id := int(row["id"].(float64))
+				row["type"] = "madness"
+				result[id] = row
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
+			}
+			break
+
+		case 8:
 			r := s.es.ThreeInitialsSearch(fn, mn, ln, country, city, did, exclIDs)
+
+			fmt.Printf("%d: %d\n", i, len(r))
 
 			for _, row := range r {
 				id := int(row["id"].(float64))
 				row["type"] = "threein"
 				result[id] = row
+
+				// exclIDs = append(exclIDs, strconv.Itoa(id))
 			}
 			break
 
@@ -391,10 +439,36 @@ func (s service) findMatches(fn, mn, ln, country, city string, did int, exclIDs 
 			break
 		}
 
-		if len(result) > 0 {
-			return result, nil
-		}
+		// fmt.Println("> ", len(result))
 	}
+
+	if len(result) > 0 {
+		return result, nil
+	}
+
+	// fmt.Println(">> ", len(result))
 
 	return nil, nil
 }
+
+// func isUnique(rows []map[string]interface{}) (unique bool, exclIDs []string) {
+
+// 	tmp := map[string]string{}
+
+// 	for _, row := range rows {
+// 		// the unique doesn't need to be based on the full names
+// 		// ES matching is already doing the FN matching so here all we have to do is
+// 		// to check the middle name and fn1 to be sure it is unique for our needs
+// 		key := fmt.Sprintf("%s%s", row["fn"], row["mn"])
+// 		tmp[key] = key
+
+// 		exclIDs = append(exclIDs, row["id"].(string))
+// 	}
+
+// 	unique = true
+// 	if len(tmp) > 1 {
+// 		unique = false
+// 	}
+
+// 	return
+// }

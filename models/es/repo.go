@@ -139,6 +139,7 @@ func (db *DB) SimpleSearch(fn, mn, ln, country, city string, did int, exclIDs []
 	result := []map[string]interface{}{}
 
 	q, err := baseQuery(did, country, exclIDs)
+
 	if err != nil {
 		return nil
 	}
@@ -329,6 +330,95 @@ func (db *DB) ShortSearch(fn, mn, ln, country, city string, did int, exclIDs []s
 	return
 }
 
+func (db *DB) MadnessSearch(fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
+	if strutils.Length(fn) != 1 {
+
+		// S<- Rule
+		// Simon A J Rule
+
+		// S<- A Rule
+		// Simon Rule
+
+		// S A Rule --->> break here!! todo!!
+		// S T Rule
+
+		// this should be already covered
+		// Simon A Rule
+		// Simon A J Rule
+
+		// this case is only for the names with MN included
+		return nil
+	}
+
+	q, err := baseQuery(did, country, exclIDs)
+	if err != nil {
+		return nil
+	}
+
+	// adding LN to a query
+	q = lastNameQuery(q, ln)
+
+	fn = strings.Replace(fn, ".", "", -1)
+	mn = strings.Replace(mn, ".", "", -1)
+
+	fnl := strutils.Length(fn)
+	mnl := strutils.Length(mn)
+
+	if fnl != 1 {
+		return nil
+	}
+
+	fnq := elastic.NewBoolQuery()
+	fnq.Should(elastic.NewMatchPhraseQuery("fn", fn))
+	fnq.Should(elastic.NewPrefixQuery("fn", fn))
+	fnq.MinimumShouldMatch("1")
+
+	if mn != "" {
+		mnq := elastic.NewBoolQuery()
+		mnq.Should(elastic.NewMatchPhraseQuery("mn", mn))
+		if mnl == 1 {
+			mnq.Should(elastic.NewPrefixQuery("mn", mn))
+		} else {
+			mnq.Should(elastic.NewMatchPhraseQuery("aliases", mn))
+		}
+		mnq.Should(elastic.NewMatchPhraseQuery("mn", ""))
+		mnq.MinimumShouldMatch("1")
+
+		q.Must(mnq, fnq)
+	} else {
+		q.Must(fnq)
+	}
+
+	nss := elastic.NewSearchSource().Query(q)
+
+	searchResult, err := db.Search().Index("experts").Type("data").SearchSource(nss).From(0).Size(10).Do(context.Background())
+	if err != nil {
+		panic(err)
+	}
+
+	if searchResult.Hits.TotalHits == 0 {
+		return nil
+	}
+	if searchResult.Hits.TotalHits > 1 {
+		return nil
+	}
+
+	for _, hit := range searchResult.Hits.Hits {
+		var row map[string]interface{}
+
+		err := json.Unmarshal(*hit.Source, &row)
+		if err != nil {
+			panic(err)
+		}
+
+		result = append(result, row)
+
+		// fmt.Printf("[%s] %s %s %s {%s}\t\t ====> \t [%s] %s, {%s} npi: %v, ttid: %v\n", id, fn, mn, ln, city, hit.Id, row["name"], row["city"], row["npi"], row["ttid"])
+	}
+
+	return
+}
+
 func (db *DB) NoMiddleNameSearch(fn, mn, ln, country, city string, did int, exclIDs []string) (result []map[string]interface{}) {
 	// this case is only for the names with NO MN on both sides!!
 	//
@@ -411,7 +501,7 @@ func (db *DB) OneMiddleNameSearch(fn, mn, ln, country, city string, did int, exc
 	//
 	// WARNING! Check later if there is more than one result here
 
-	if mn != "" {
+	if mn != "" || strutils.Length(fn) <= 1 {
 		// ---------------------------
 		// ->Ralf    Dittrich {OSNABRÜCK}             ====> Found [did:1]: 5711743
 		// 0.Ralf F. Dittrich {}
