@@ -17,3 +17,5 @@ deployments/.env
 cmd/*/*.csv
 data/*
 cmd/test/*
+.devcontainer
+*.log
