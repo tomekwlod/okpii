@@ -63,8 +63,6 @@ func ESClient() (*DB, error) {
 	}
 	iport, _ := strconv.Atoi(port)
 
-	fmt.Printf("\nConnecting to ElasticServer on %s:%s\n", host, port)
-
 	ec := esConfig{host, iport, false}
 
 	// Create ES client here; If no connection - nothing to do here
@@ -79,7 +77,7 @@ func ESClient() (*DB, error) {
 		return nil, err
 	}
 
-	fmt.Println("Connection to ElasticServer established")
+	fmt.Printf("\nConnection to ElasticServer established %s:%s\n", host, port)
 
 	return &DB{db}, nil
 }
