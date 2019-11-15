@@ -59,9 +59,11 @@ func ESClient() (*DB, error) {
 	}
 	port := os.Getenv("ES_PORT")
 	if port == "" {
-		port = "9202"
+		port = "9201"
 	}
 	iport, _ := strconv.Atoi(port)
+
+	fmt.Printf("\nConnecting to ElasticServer on %s:%s\n", host, port)
 
 	ec := esConfig{host, iport, false}
 
